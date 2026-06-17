@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment / embedded Python
+.python312/
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Qwen
+.qwen/
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Android build artifacts
+*.apk
+*.aab
+bin/
