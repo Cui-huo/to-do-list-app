@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0] — 2026-06-19
+
+### P1 部分完成 — 导出 / 夜间模式 / WebDAV 桩
+
+- **新增**: 数据导出服务（JSON / TEXT），含空数据库处理（§5.5）
+- **新增**: 夜间模式设置服务，持久化到 UserSettings（§5.6）
+- **新增**: WebDAV 同步服务桩 + 凭据管理（P2 预备，§5.8）
+- **重构**: export / settings / webdav 全部遵循 R26 统一返回结构 `(bool, result)`
+- **修复**: 两个时序测试（`time.sleep` 解决 `:memory:` 同微秒竞争）
+- **新增规则**: R29 时间戳竞争修复（`test_note_service.py` 两处 `time.sleep(0.001)`）
+- **规则文档**: `rules.md` 拆分为 `rules/core_rules.md` + `rules/ui_rules.md`
+- **测试**: 125 全绿（新增 12 个：export 5 + settings 3 + webdav 4）
+
 ## [1.0.0] — 2026-06-17
 
 ### 首个版本 — P0 基础核心功能
@@ -13,5 +26,3 @@
 - 前端实时校验 + 后端提交校验
 - SQLite 数据持久化
 - 冒烟测试 + UI 测试通过
-
-> **注意：** 当前为基础版本，UI 较粗略，仍有大量优化和修正空间。详见 spec.md 和后续版本计划。

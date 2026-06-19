@@ -18,9 +18,7 @@ class ReminderService:
         if note is None:
             raise ValueError(f"便签 ID={note_id} 不存在")
 
-        # 校验时间
-        if remind_at < datetime.now().isoformat():
-            raise ValueError("提醒时间不能在过去")
+        # spec §5.7: 允许过去/未来任意时间（过去时间立即触发）
 
         # 校验数量上限
         count = self.conn.execute(

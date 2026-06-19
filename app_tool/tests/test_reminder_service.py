@@ -24,8 +24,8 @@ class TestReminderCRUD:
         assert reminder.remind_at == future
         assert reminder.is_triggered == 0
 
-    def test_create_past_time_raises(self, db_conn):
-        """提醒时间在过去应抛出 ValueError。"""
+    def test_create_past_time_allowed(self, db_conn):
+        """spec §5.7: 提醒允许过去时间（立即触发通知）。"""
         from app_tool.model.database import init_db
         from app_tool.controller.note_service import NoteService
         from app_tool.controller.reminder_service import ReminderService
@@ -36,8 +36,10 @@ class TestReminderCRUD:
 
         note = note_svc.create(title="测试", content="内容")
         past = (datetime.now() - timedelta(hours=1)).isoformat()
-        with pytest.raises(ValueError):
-            svc.create(note_id=note.id, remind_at=past)
+        reminder = svc.create(note_id=note.id, remind_at=past)
+
+        assert reminder.id is not None
+        assert reminder.remind_at == past
 
     def test_create_nonexistent_note_raises(self, db_conn):
         """为不存在的便签创建提醒应抛出 ValueError。"""

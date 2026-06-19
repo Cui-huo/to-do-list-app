@@ -72,7 +72,8 @@ class SearchService:
             )
             params.extend([start_day, end_day])
 
-        where_clause = "WHERE n.is_completed = 0"
+        # spec §5.4: 搜索始终同时返回已完成和未完成便签
+        where_clause = "WHERE 1=1"
         if conditions:
             where_clause += " AND " + " AND ".join(conditions)
 

@@ -1,5 +1,7 @@
 """test_note_service.py — 便签 CRUD + 排序 + 标签关联测试（红灯）。"""
 
+import time
+
 import pytest
 from datetime import datetime
 
@@ -72,6 +74,7 @@ class TestNoteCRUD:
         init_db(db_conn)
         svc = NoteService(db_conn)
         note = svc.create(title="旧标题", content="旧内容")
+        time.sleep(0.001)
         updated = svc.update(note.id, title="新标题", content="新内容")
 
         assert updated.title == "新标题"
@@ -176,6 +179,31 @@ class TestCompleteToggle:
         assert incomplete.is_completed == 0
         assert incomplete.completed_at is None
 
+    def test_mark_complete_already_completed_raises(self, db_conn):
+        """spec §5.1 标记完成: 已完成的便签再次标记应拒绝（R6 幂等）。"""
+        from app_tool.model.database import init_db
+        from app_tool.controller.note_service import NoteService
+
+        init_db(db_conn)
+        svc = NoteService(db_conn)
+        note = svc.create(title="已完成", content="内容")
+        svc.mark_complete(note.id)
+
+        with pytest.raises(ValueError, match="已完成"):
+            svc.mark_complete(note.id)
+
+    def test_mark_incomplete_already_incomplete_raises(self, db_conn):
+        """spec §5.1 取消完成: 未完成的便签再次取消应拒绝。"""
+        from app_tool.model.database import init_db
+        from app_tool.controller.note_service import NoteService
+
+        init_db(db_conn)
+        svc = NoteService(db_conn)
+        note = svc.create(title="未完成", content="内容")
+
+        with pytest.raises(ValueError, match="未完成"):
+            svc.mark_incomplete(note.id)
+
 
 class TestSorting:
     def test_get_incomplete_sorted_by_updated_at(self, db_conn):
@@ -186,6 +214,7 @@ class TestSorting:
         init_db(db_conn)
         svc = NoteService(db_conn)
         n1 = svc.create(title="第一", content="内容1")
+        time.sleep(0.001)
         n2 = svc.create(title="第二", content="内容2")
         # 第二应该排在前面
         notes = svc.get_incomplete()
@@ -587,3 +616,91 @@ class TestNoteTags:
         assert full_note is not None
         assert len(full_note.tags) == 2
         assert full_note.tags[0].name == "紧急重要"
+
+    def test_add_tag_exceeds_max_limit_raises(self, db_conn):
+        """spec §3.1: 每个便签最多 3 个标签，超出时后端提交校验拒绝。"""
+        from app_tool.model.database import init_db
+        from app_tool.controller.note_service import NoteService
+
+        init_db(db_conn)
+        svc = NoteService(db_conn)
+        note = svc.create(title="标签上限", content="内容")
+        svc.add_tag(note.id, "紧急重要")
+        svc.add_tag(note.id, "紧急")
+        svc.add_tag(note.id, "重要不紧急")
+
+        with pytest.raises(ValueError, match="最多 3 个标签"):
+            svc.add_tag(note.id, "P1")
+
+    def test_create_note_with_tag_names(self, db_conn):
+        """spec §5.1 新增: create() 接受 tag_names 参数并写入 NoteTag 关联。"""
+        from app_tool.model.database import init_db
+        from app_tool.controller.note_service import NoteService
+
+        init_db(db_conn)
+        svc = NoteService(db_conn)
+        note = svc.create(title="带标签创建", content="内容", tag_names=["紧急重要", "紧急"])
+
+        assert note.id is not None
+        assert note.content == "内容"
+        tags = svc.get_tags(note.id)
+        assert len(tags) == 2
+        assert {t.name for t in tags} == {"紧急重要", "紧急"}
+
+    def test_create_note_skips_nonexistent_tags(self, db_conn):
+        """spec §5.1 新增: create 遇到不存在的标签时自动跳过。"""
+        from app_tool.model.database import init_db
+        from app_tool.controller.note_service import NoteService
+
+        init_db(db_conn)
+        svc = NoteService(db_conn)
+        note = svc.create(title="跳过不存在标签", content="内容",
+                          tag_names=["紧急重要", "不存在的标签"])
+
+        assert note.id is not None
+        tags = svc.get_tags(note.id)
+        assert len(tags) == 1
+        assert tags[0].name == "紧急重要"
+
+    def test_update_note_set_tag_names(self, db_conn):
+        """spec §5.1 编辑: update() 接受 tag_names 替换全部标签。"""
+        from app_tool.model.database import init_db
+        from app_tool.controller.note_service import NoteService
+
+        init_db(db_conn)
+        svc = NoteService(db_conn)
+        note = svc.create(title="标签替换", content="内容", tag_names=["紧急重要", "紧急"])
+        # 替换为不同的标签集
+        updated = svc.update(note.id, tag_names=["重要不紧急", "P1"])
+
+        assert updated.id == note.id
+        tags = svc.get_tags(note.id)
+        assert len(tags) == 2
+        assert {t.name for t in tags} == {"重要不紧急", "P1"}
+
+    def test_update_note_clear_tags(self, db_conn):
+        """spec §5.1 编辑: tag_names=[] 清空所有标签。"""
+        from app_tool.model.database import init_db
+        from app_tool.controller.note_service import NoteService
+
+        init_db(db_conn)
+        svc = NoteService(db_conn)
+        note = svc.create(title="清空标签", content="内容", tag_names=["紧急重要", "紧急"])
+        svc.update(note.id, tag_names=[])
+
+        tags = svc.get_tags(note.id)
+        assert len(tags) == 0
+
+    def test_update_note_skip_nonexistent_tags(self, db_conn):
+        """spec §5.1 编辑: update 不存在的标签自动跳过。"""
+        from app_tool.model.database import init_db
+        from app_tool.controller.note_service import NoteService
+
+        init_db(db_conn)
+        svc = NoteService(db_conn)
+        note = svc.create(title="跳过不存在", content="内容", tag_names=["紧急重要"])
+        svc.update(note.id, tag_names=["紧急", "不存在的标签"])
+
+        tags = svc.get_tags(note.id)
+        assert len(tags) == 1
+        assert tags[0].name == "紧急"

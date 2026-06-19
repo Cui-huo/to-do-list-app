@@ -243,8 +243,8 @@ class TestCombinedSearch:
         assert len(results) == 1
         assert results[0].title == "2025年"
 
-    def test_all_empty_params_returns_all_incomplete(self, db_conn):
-        """所有参数为空时返回全部未完成便签。"""
+    def test_all_empty_params_returns_all_notes(self, db_conn):
+        """spec §5.4: 搜索始终同时返回已完成和未完成便签。"""
         from app_tool.model.database import init_db
         from app_tool.controller.note_service import NoteService
         from app_tool.controller.search_service import SearchService
@@ -260,6 +260,25 @@ class TestCombinedSearch:
         note_svc.mark_complete(n3.id)
 
         results = svc.search()
+        assert len(results) == 3
+        titles = {r.title for r in results}
+        assert titles == {"A", "B", "C"}
+
+    def test_keyword_search_includes_completed(self, db_conn):
+        """spec §5.4: 关键词搜索同时返回已完成便签。"""
+        from app_tool.model.database import init_db
+        from app_tool.controller.note_service import NoteService
+        from app_tool.controller.search_service import SearchService
+
+        init_db(db_conn)
+        note_svc = NoteService(db_conn)
+        svc = SearchService(db_conn)
+
+        note_svc.create(title="pending task", content="todo")
+        n2 = note_svc.create(title="completed task", content="done")
+        note_svc.mark_complete(n2.id)
+
+        results = svc.search(keyword="task")
         assert len(results) == 2
         titles = {r.title for r in results}
-        assert titles == {"A", "B"}
+        assert titles == {"pending task", "completed task"}

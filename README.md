@@ -2,8 +2,8 @@
 
 > Android 卡片式便签应用 — 支持标签分类、拖拽排序、全文搜索、撤销删除、夜间模式、本地提醒和 WebDAV 同步。
 
-**版本：** 1.0.0  
-**开发状态：** P0 基础核心功能完成，冒烟测试 + UI 测试通过  
+**版本：** 1.1.0
+**开发状态：** P1 部分完成（导出 + 夜间模式），125 测试全绿
 **技术栈：** Kivy + KivyMD / SQLite / pytest
 
 ---
@@ -13,7 +13,7 @@
 | 阶段 | 内容 | 状态 |
 |---|---|---|
 | **P0** | 便签 CRUD + 标签管理 + 搜索 + 置顶 + 拖拽排序 + UI | ✅ 基础完成 |
-| **P1** | JSON/TEXT 导出 + 夜间模式 + 多提醒 (Android) | 🔲 待开发 |
+| **P1** | JSON/TEXT 导出 + 夜间模式 + 多提醒 (Android) | ✅ 导出/夜间模式已完成 |
 | **P2** | WebDAV 同步 | 🔲 待开发 |
 
 ### 核心特性
@@ -34,15 +34,15 @@
 .
 ├── main.py                  # 应用入口
 ├── spec.md                  # 完整功能规格 (SDD)
-├── rules.md                 # 19 条设计规则
+├── rules/                   # 设计规则（core_rules.md + ui_rules.md）
 ├── skills.md                # 可复用操作流程
 ├── app_tool/
 │   ├── config.py            # 常量配置
 │   ├── model/               # 数据模型层
-│   ├── controller/          # 控制器层（业务逻辑）
+│   ├── controller/          # 控制器层（业务逻辑 + export + settings + webdav）
 │   ├── ui/                  # UI 层 (KivyMD)
 │   ├── res/                 # 静态资源
-│   └── tests/               # pytest 测试套件
+│   └── tests/               # pytest 测试套件（125 测试）
 └── .python312/              # 嵌入式 Python（开发环境）
 ```
 

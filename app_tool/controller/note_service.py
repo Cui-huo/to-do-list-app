@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime
 from app_tool.model.models import Note, Tag
 from app_tool.model.database import fts_insert, fts_update, fts_delete
-from app_tool.config import UNDO_TIMEOUT_SECONDS, MAX_TITLE_LENGTH, MAX_CONTENT_LENGTH
+from app_tool.config import UNDO_TIMEOUT_SECONDS, MAX_TITLE_LENGTH, MAX_CONTENT_LENGTH, MAX_TAGS_PER_NOTE
 
 
 def _random_title() -> str:
@@ -38,7 +38,7 @@ class NoteService:
 
     # ── CRUD ──
 
-    def create(self, title: str = "", content: str = "") -> Note:
+    def create(self, title: str = "", content: str = "", tag_names: list[str] | None = None) -> Note:
         title = title.strip()
         content = content.strip()
         if not content:
@@ -57,6 +57,14 @@ class NoteService:
         self.conn.commit()
         fts_insert(self.conn, note_id, title, content)
         self.conn.commit()
+        # spec §5.1: 创建时关联标签，不存在的标签自动跳过
+        if tag_names:
+            for name in tag_names:
+                try:
+                    self.add_tag(note_id, name)
+                except ValueError as e:
+                    if "不存在" not in str(e):
+                        raise
         return Note(
             id=note_id, title=title, content=content,
             created_at=now, updated_at=now,
@@ -67,7 +75,8 @@ class NoteService:
             self.conn.execute("SELECT * FROM Note WHERE id=?", (note_id,)).fetchone()
         )
 
-    def update(self, note_id: int, title: str | None = None, content: str | None = None) -> Note:
+    def update(self, note_id: int, title: str | None = None, content: str | None = None,
+               tag_names: list[str] | None = None) -> Note:
         note = self.get_by_id(note_id)
         if note is None:
             raise ValueError(f"便签 ID={note_id} 不存在")
@@ -85,6 +94,20 @@ class NoteService:
             (new_title, new_content, now, note_id),
         )
         fts_update(self.conn, note_id, new_title, new_content)
+        # spec §5.1: 标签变更时同步更新 NoteTag 关联（仅增/删）
+        if tag_names is not None:
+            current_names = {t.name for t in self.get_tags(note_id)}
+            new_names = set(tag_names)
+            # 先移除不再需要的标签（释放配额）
+            for name in current_names - new_names:
+                self.remove_tag(note_id, name)
+            # 再添加新标签（不存在的自动跳过）
+            for name in new_names - current_names:
+                try:
+                    self.add_tag(note_id, name)
+                except ValueError as e:
+                    if "不存在" not in str(e):
+                        raise
         self.conn.commit()
         updated = self.get_by_id(note_id)
         assert updated is not None
@@ -139,25 +162,35 @@ class NoteService:
     # ── 完成状态 ──
 
     def mark_complete(self, note_id: int) -> Note:
+        note = self.get_by_id(note_id)
+        if note is None:
+            raise ValueError(f"便签 ID={note_id} 不存在")
+        if note.is_completed:
+            raise ValueError("该便签已完成")
         now = datetime.now().isoformat()
         self.conn.execute(
             "UPDATE Note SET is_completed=1, completed_at=?, position=0 WHERE id=?",
             (now, note_id),
         )
         self.conn.commit()
-        note = self.get_by_id(note_id)
-        assert note is not None
-        return note
+        updated = self.get_by_id(note_id)
+        assert updated is not None
+        return updated
 
     def mark_incomplete(self, note_id: int) -> Note:
+        note = self.get_by_id(note_id)
+        if note is None:
+            raise ValueError(f"便签 ID={note_id} 不存在")
+        if not note.is_completed:
+            raise ValueError("该便签未完成")
         self.conn.execute(
             "UPDATE Note SET is_completed=0, completed_at=NULL WHERE id=?",
             (note_id,),
         )
         self.conn.commit()
-        note = self.get_by_id(note_id)
-        assert note is not None
-        return note
+        updated = self.get_by_id(note_id)
+        assert updated is not None
+        return updated
 
     # ── 手动置顶 ──
 
@@ -287,6 +320,12 @@ class NoteService:
         ).fetchone()
         if tag is None:
             raise ValueError(f"标签「{tag_name}」不存在")
+        # spec §3.1: 每个便签最多 3 个标签
+        existing_count = self.conn.execute(
+            "SELECT COUNT(*) FROM NoteTag WHERE note_id=?", (note_id,)
+        ).fetchone()[0]
+        if existing_count >= MAX_TAGS_PER_NOTE:
+            raise ValueError(f"每个便签最多 {MAX_TAGS_PER_NOTE} 个标签")
         try:
             self.conn.execute(
                 "INSERT INTO NoteTag (note_id, tag_id) VALUES (?, ?)",
