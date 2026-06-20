@@ -5,7 +5,6 @@ from kivy.metrics import dp
 from kivy.properties import ObjectProperty, StringProperty
 from kivy.uix.widget import Widget
 from kivymd.uix.screen import MDScreen
-from kivymd.uix.snackbar import MDSnackbar
 from kivymd.uix.button import MDIconButton, MDFloatingActionButton, MDFlatButton
 from kivymd.uix.label import MDLabel
 from kivymd.uix.boxlayout import MDBoxLayout
@@ -416,9 +415,38 @@ class MainScreen(MDScreen):
         return card
 
     def _toast(self, text: str):
-        snackbar = MDSnackbar()
-        snackbar.text = text
-        snackbar.open()
+        from kivy.animation import Animation
+        from kivymd.uix.label import MDLabel
+        from kivymd.uix.card import MDCard
+
+        card = MDCard(
+            size_hint=(None, None),
+            size=(self.width - dp(32), dp(48)),
+            pos=(dp(16), dp(80)),
+            md_bg_color=(0.2, 0.2, 0.2, 0.95),
+            radius=(dp(8), dp(8), dp(8), dp(8)),
+            opacity=0,
+            padding=(dp(16), dp(12), dp(16), dp(12)),
+        )
+        label = MDLabel(
+            text=text,
+            theme_text_color="Custom",
+            text_color=(1, 1, 1, 1),
+            font_style="Body2",
+            halign="center",
+            adaptive_height=True,
+            size_hint_y=None,
+        )
+        card.add_widget(label)
+        # 等 label 渲染后再根据实际高度调整 card
+        label.bind(
+            texture_size=lambda lbl, ts: setattr(card, "height", ts[1] + dp(24))
+        )
+        self.add_widget(card)
+
+        anim = Animation(opacity=1, duration=0.15) + Animation(opacity=1, duration=1.5) + Animation(opacity=0, duration=0.2)
+        anim.bind(on_complete=lambda *_: self.remove_widget(card))
+        anim.start(card)
 
     # ── 操作处理 ──
 
