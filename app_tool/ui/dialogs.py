@@ -43,7 +43,7 @@ KV = """
 
     ScrollView:
         size_hint_y: None
-        height: dp(40)
+        height: dp(56)
         do_scroll_x: True
         do_scroll_y: False
 
@@ -92,7 +92,7 @@ class AddEditContent(MDBoxLayout):
         chip = MDChip(
             text=name,
             size_hint=(None, None),
-            height=28,
+            height=32,
             md_bg_color=bg,
             text_color=tc,
         )

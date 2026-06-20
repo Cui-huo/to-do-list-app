@@ -1,0 +1,189 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.1.0, pluggy-1.6.0 -- C:\Users\仗剑天涯\Desktop\todo-list-app\.python312\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\仗剑天涯\Desktop\todo-list-app
+collecting ... collected 27 items
+
+app_tool/tests/test_ui.py::TestNoteCardButtonSizes::test_complete_btn_icon_size FAILED [  3%]
+app_tool/tests/test_ui.py::TestNoteCardButtonSizes::test_pin_btn_icon_size FAILED [  7%]
+app_tool/tests/test_ui.py::TestNoteCardButtonSizes::test_edit_btn_icon_size FAILED [ 11%]
+app_tool/tests/test_ui.py::TestNoteCardButtonSizes::test_delete_btn_icon_size FAILED [ 14%]
+app_tool/tests/test_ui.py::TestChipSizes::test_note_card_chip_height FAILED [ 18%]
+app_tool/tests/test_ui.py::TestChipSizes::test_dialog_chip_height FAILED [ 22%]
+app_tool/tests/test_ui.py::TestChipSizes::test_search_chip_height FAILED [ 25%]
+app_tool/tests/test_ui.py::TestChipSizes::test_note_card_chip_width FAILED [ 29%]
+app_tool/tests/test_ui.py::TestFuncRowSizes::test_func_sort_icon_size FAILED [ 33%]
+app_tool/tests/test_ui.py::TestFuncRowSizes::test_func_search_icon_size FAILED [ 37%]
+app_tool/tests/test_ui.py::TestFuncRowSizes::test_func_tag_icon_size FAILED [ 40%]
+app_tool/tests/test_ui.py::TestFuncRowSizes::test_func_settings_icon_size FAILED [ 44%]
+app_tool/tests/test_ui.py::TestFuncRowSizes::test_func_row_label_font_caption FAILED [ 48%]
+app_tool/tests/test_ui.py::TestSearchBarCloseButton::test_search_close_btn_size FAILED [ 51%]
+app_tool/tests/test_ui.py::TestDialogScrollViewHeight::test_add_edit_scrollview_height FAILED [ 55%]
+app_tool/tests/test_ui.py::TestDialogScrollViewHeight::test_search_scrollview_height FAILED [ 59%]
+app_tool/tests/test_ui.py::TestCardPaddingAndSpacing::test_card_padding PASSED [ 62%]
+app_tool/tests/test_ui.py::TestCardPaddingAndSpacing::test_card_internal_spacing PASSED [ 66%]
+app_tool/tests/test_ui.py::TestCardPaddingAndSpacing::test_chips_box_spacing PASSED [ 70%]
+app_tool/tests/test_ui.py::TestCardPaddingAndSpacing::test_action_buttons_spacing PASSED [ 74%]
+app_tool/tests/test_ui.py::TestSearchPanelComponents::test_year_is_dropdown_not_textfield FAILED [ 77%]
+app_tool/tests/test_ui.py::TestSearchPanelComponents::test_month_is_dropdown_not_textfield FAILED [ 81%]
+app_tool/tests/test_ui.py::TestSearchPanelComponents::test_week_is_dropdown_not_textfield FAILED [ 85%]
+app_tool/tests/test_ui.py::TestSearchPanelComponents::test_search_has_time_type_chip FAILED [ 88%]
+app_tool/tests/test_ui.py::TestFABPositioning::test_fab_uses_fixed_dp_not_percent FAILED [ 92%]
+app_tool/tests/test_ui.py::TestFontHierarchy::test_note_card_title_font PASSED [ 96%]
+app_tool/tests/test_ui.py::TestFontHierarchy::test_note_card_content_font PASSED [100%]
+
+================================== FAILURES ===================================
+E   AssertionError: complete_btn 宽度期望 40dp，实际 32.0
+    assert 32.0 == 40 ± 1
+      
+      comparison failed
+      Obtained: 32.0
+      Expected: 40 ± 1
+C:\Users\仗剑天涯\Desktop\todo-list-app\app_tool\tests\test_ui.py:26: AssertionError: complete_btn 宽度期望 40dp，实际 32.0
+E   AssertionError: pin_btn 宽度期望 40dp，实际 32.0
+    assert 32.0 == 40 ± 1
+      
+      comparison failed
+      Obtained: 32.0
+      Expected: 40 ± 1
+C:\Users\仗剑天涯\Desktop\todo-list-app\app_tool\tests\test_ui.py:31: AssertionError: pin_btn 宽度期望 40dp，实际 32.0
+E   AssertionError: 编辑按钮宽度期望 40dp，实际 32.0
+    assert 32.0 == 40 ± 1
+      
+      comparison failed
+      Obtained: 32.0
+      Expected: 40 ± 1
+C:\Users\仗剑天涯\Desktop\todo-list-app\app_tool\tests\test_ui.py:38: AssertionError: 编辑按钮宽度期望 40dp，实际 32.0
+E   AssertionError: 删除按钮宽度期望 40dp，实际 32.0
+    assert 32.0 == 40 ± 1
+      
+      comparison failed
+      Obtained: 32.0
+      Expected: 40 ± 1
+C:\Users\仗剑天涯\Desktop\todo-list-app\app_tool\tests\test_ui.py:45: AssertionError: 删除按钮宽度期望 40dp，实际 32.0
+E   AssertionError: 标签芯片高度期望 32dp，实际 28
+    assert 28 == 32 ± 1
+      
+      comparison failed
+      Obtained: 28
+      Expected: 32 ± 1
+C:\Users\仗剑天涯\Desktop\todo-list-app\app_tool\tests\test_ui.py:63: AssertionError: 标签芯片高度期望 32dp，实际 28
+E   AssertionError: 对话框标签芯片高度期望 32dp，实际 28
+    assert 28 == 32 ± 1
+      
+      comparison failed
+      Obtained: 28
+      Expected: 32 ± 1
+C:\Users\仗剑天涯\Desktop\todo-list-app\app_tool\tests\test_ui.py:73: AssertionError: 对话框标签芯片高度期望 32dp，实际 28
+E   AssertionError: 搜索面板标签芯片高度期望 32dp，实际 28
+    assert 28 == 32 ± 1
+      
+      comparison failed
+      Obtained: 28
+      Expected: 32 ± 1
+C:\Users\仗剑天涯\Desktop\todo-list-app\app_tool\tests\test_ui.py:83: AssertionError: 搜索面板标签芯片高度期望 32dp，实际 28
+E   AssertionError: 标签芯片宽度期望 90dp，实际 100
+    assert 100 == 90 ± 2
+      
+      comparison failed
+      Obtained: 100
+      Expected: 90 ± 2
+C:\Users\仗剑天涯\Desktop\todo-list-app\app_tool\tests\test_ui.py:93: AssertionError: 标签芯片宽度期望 90dp，实际 100
+E   AssertionError: func_sort_icon 宽度期望 36dp，实际 28.0
+    assert 28.0 == 36 ± 1
+      
+      comparison failed
+      Obtained: 28.0
+      Expected: 36 ± 1
+C:\Users\仗剑天涯\Desktop\todo-list-app\app_tool\tests\test_ui.py:112: AssertionError: func_sort_icon 宽度期望 36dp，实际 28.0
+E   AssertionError: 搜索图标宽度期望 36dp，实际 28.0
+    assert 28.0 == 36 ± 1
+      
+      comparison failed
+      Obtained: 28.0
+      Expected: 36 ± 1
+C:\Users\仗剑天涯\Desktop\todo-list-app\app_tool\tests\test_ui.py:119: AssertionError: 搜索图标宽度期望 36dp，实际 28.0
+E   AssertionError: 标签图标宽度期望 36dp，实际 28.0
+    assert 28.0 == 36 ± 1
+      
+      comparison failed
+      Obtained: 28.0
+      Expected: 36 ± 1
+C:\Users\仗剑天涯\Desktop\todo-list-app\app_tool\tests\test_ui.py:126: AssertionError: 标签图标宽度期望 36dp，实际 28.0
+E   AssertionError: 设置图标宽度期望 36dp，实际 28.0
+    assert 28.0 == 36 ± 1
+      
+      comparison failed
+      Obtained: 28.0
+      Expected: 36 ± 1
+C:\Users\仗剑天涯\Desktop\todo-list-app\app_tool\tests\test_ui.py:133: AssertionError: 设置图标宽度期望 36dp，实际 28.0
+E   AssertionError: func_row 标签字体期望 'Caption'，实际 'Overline'
+    assert 'Overline' == 'Caption'
+      
+      - Caption
+      + Overline
+C:\Users\仗剑天涯\Desktop\todo-list-app\app_tool\tests\test_ui.py:140: AssertionError: func_row 标签字体期望 'Caption'，实际 'Overline'
+E   AssertionError: 搜索关闭按钮宽度期望 28dp，实际 24.0
+    assert 27 <= 24.0
+C:\Users\仗剑天涯\Desktop\todo-list-app\app_tool\tests\test_ui.py:156: AssertionError: 搜索关闭按钮宽度期望 28dp，实际 24.0
+E   AssertionError: 对话框标签 ScrollView 高度期望 56dp，实际 40.0
+    assert 40.0 == 56 ± 1
+      
+      comparison failed
+      Obtained: 40.0
+      Expected: 56 ± 1
+C:\Users\仗剑天涯\Desktop\todo-list-app\app_tool\tests\test_ui.py:173: AssertionError: 对话框标签 ScrollView 高度期望 56dp，实际 40.0
+E   AssertionError: 搜索面板标签 ScrollView 高度期望 56dp，实际 40.0
+    assert 40.0 == 56 ± 1
+      
+      comparison failed
+      Obtained: 40.0
+      Expected: 56 ± 1
+C:\Users\仗剑天涯\Desktop\todo-list-app\app_tool\tests\test_ui.py:182: AssertionError: 搜索面板标签 ScrollView 高度期望 56dp，实际 40.0
+E   AssertionError: 年份选择器应是下拉组件，不是 MDTextField
+    assert not True
+     +  where True = isinstance(<WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D3BF0A60>>, <class 'kivymd.uix.textfield.textfield.MDTextField'>)
+     +    where <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D3BF0A60>> = {'keyword_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D3B03850>>, 'search_tags_box': <WeakProxy to <kivymd.uix.boxlayout.MDBoxLayout object at 0x000001C8D3BD8670>>, 'year_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D3BF0A60>>, 'month_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D3C85E10>>, 'week_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D3D230E0>>}.year_field
+     +      where {'keyword_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D3B03850>>, 'search_tags_box': <WeakProxy to <kivymd.uix.boxlayout.MDBoxLayout object at 0x000001C8D3BD8670>>, 'year_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D3BF0A60>>, 'month_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D3C85E10>>, 'week_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D3D230E0>>} = <app_tool.ui.search_dialog.SearchContent object at 0x000001C8D3B02190>.ids
+C:\Users\仗剑天涯\Desktop\todo-list-app\app_tool\tests\test_ui.py:237: AssertionError: 年份选择器应是下拉组件，不是 MDTextField
+E   AssertionError: 月份选择器应是下拉组件，不是 MDTextField
+    assert not True
+     +  where True = isinstance(<WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D3F74980>>, <class 'kivymd.uix.textfield.textfield.MDTextField'>)
+     +    where <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D3F74980>> = {'keyword_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D3DDE3C0>>, 'search_tags_box': <WeakProxy to <kivymd.uix.boxlayout.MDBoxLayout object at 0x000001C8D3EAF150>>, 'year_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D3EBF540>>, 'month_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D3F74980>>, 'week_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D4011C50>>}.month_field
+     +      where {'keyword_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D3DDE3C0>>, 'search_tags_box': <WeakProxy to <kivymd.uix.boxlayout.MDBoxLayout object at 0x000001C8D3EAF150>>, 'year_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D3EBF540>>, 'month_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D3F74980>>, 'week_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D4011C50>>} = <app_tool.ui.search_dialog.SearchContent object at 0x000001C8D3DDCD00>.ids
+C:\Users\仗剑天涯\Desktop\todo-list-app\app_tool\tests\test_ui.py:243: AssertionError: 月份选择器应是下拉组件，不是 MDTextField
+E   AssertionError: 周数选择器应是下拉组件，不是 MDTextField
+    assert not True
+     +  where True = isinstance(<WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D42F09F0>>, <class 'kivymd.uix.textfield.textfield.MDTextField'>)
+     +    where <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D42F09F0>> = {'keyword_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D40C9160>>, 'search_tags_box': <WeakProxy to <kivymd.uix.boxlayout.MDBoxLayout object at 0x000001C8D4185EF0>>, 'year_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D41A22E0>>, 'month_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D423F690>>, 'week_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D42F09F0>>}.week_field
+     +      where {'keyword_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D40C9160>>, 'search_tags_box': <WeakProxy to <kivymd.uix.boxlayout.MDBoxLayout object at 0x000001C8D4185EF0>>, 'year_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D41A22E0>>, 'month_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D423F690>>, 'week_field': <WeakProxy to <kivymd.uix.textfield.textfield.MDTextField object at 0x000001C8D42F09F0>>} = <app_tool.ui.search_dialog.SearchContent object at 0x000001C8D40B3A10>.ids
+C:\Users\仗剑天涯\Desktop\todo-list-app\app_tool\tests\test_ui.py:249: AssertionError: 周数选择器应是下拉组件，不是 MDTextField
+E   AssertionError: 搜索面板缺少时间类型芯片切换组件（time_type_box）
+    assert False
+C:\Users\仗剑天涯\Desktop\todo-list-app\app_tool\tests\test_ui.py:255: AssertionError: 搜索面板缺少时间类型芯片切换组件（time_type_box）
+E   AssertionError: FAB 不得使用百分比 pos_hint，应使用固定 dp 定位距右下角 16dp
+    assert not True
+C:\Users\仗剑天涯\Desktop\todo-list-app\app_tool\tests\test_ui.py:278: AssertionError: FAB 不得使用百分比 pos_hint，应使用固定 dp 定位距右下角 16dp
+=========================== short test summary info ===========================
+FAILED app_tool/tests/test_ui.py::TestNoteCardButtonSizes::test_complete_btn_icon_size
+FAILED app_tool/tests/test_ui.py::TestNoteCardButtonSizes::test_pin_btn_icon_size
+FAILED app_tool/tests/test_ui.py::TestNoteCardButtonSizes::test_edit_btn_icon_size
+FAILED app_tool/tests/test_ui.py::TestNoteCardButtonSizes::test_delete_btn_icon_size
+FAILED app_tool/tests/test_ui.py::TestChipSizes::test_note_card_chip_height
+FAILED app_tool/tests/test_ui.py::TestChipSizes::test_dialog_chip_height - As...
+FAILED app_tool/tests/test_ui.py::TestChipSizes::test_search_chip_height - As...
+FAILED app_tool/tests/test_ui.py::TestChipSizes::test_note_card_chip_width - ...
+FAILED app_tool/tests/test_ui.py::TestFuncRowSizes::test_func_sort_icon_size
+FAILED app_tool/tests/test_ui.py::TestFuncRowSizes::test_func_search_icon_size
+FAILED app_tool/tests/test_ui.py::TestFuncRowSizes::test_func_tag_icon_size
+FAILED app_tool/tests/test_ui.py::TestFuncRowSizes::test_func_settings_icon_size
+FAILED app_tool/tests/test_ui.py::TestFuncRowSizes::test_func_row_label_font_caption
+FAILED app_tool/tests/test_ui.py::TestSearchBarCloseButton::test_search_close_btn_size
+FAILED app_tool/tests/test_ui.py::TestDialogScrollViewHeight::test_add_edit_scrollview_height
+FAILED app_tool/tests/test_ui.py::TestDialogScrollViewHeight::test_search_scrollview_height
+FAILED app_tool/tests/test_ui.py::TestSearchPanelComponents::test_year_is_dropdown_not_textfield
+FAILED app_tool/tests/test_ui.py::TestSearchPanelComponents::test_month_is_dropdown_not_textfield
+FAILED app_tool/tests/test_ui.py::TestSearchPanelComponents::test_week_is_dropdown_not_textfield
+FAILED app_tool/tests/test_ui.py::TestSearchPanelComponents::test_search_has_time_type_chip
+FAILED app_tool/tests/test_ui.py::TestFABPositioning::test_fab_uses_fixed_dp_not_percent
+======================== 21 failed, 6 passed in 5.43s =========================

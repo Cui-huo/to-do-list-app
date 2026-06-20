@@ -57,7 +57,7 @@ KV = """
             id: func_row
             orientation: "horizontal"
             size_hint_y: None
-            height: dp(52)
+            height: dp(60)
             md_bg_color: (0.97, 0.97, 0.97, 1)
             padding: dp(4), dp(4)
             spacing: dp(2)
@@ -73,16 +73,16 @@ KV = """
                     id: func_sort_icon
                     icon: "sort-clock-ascending"
                     size_hint: None, None
-                    size: dp(28), dp(28)
+                    size: dp(36), dp(36)
                     pos_hint: {"center_x": 0.5}
                     on_release: root.toggle_sort_preference()
 
                 MDLabel:
                     text: "便签排序"
-                    font_style: "Overline"
+                    font_style: "Caption"
                     halign: "center"
                     size_hint_y: None
-                    height: dp(16)
+                    height: dp(18)
 
             MDBoxLayout:
                 orientation: "vertical"
@@ -94,16 +94,16 @@ KV = """
                 MDIconButton:
                     icon: "magnify"
                     size_hint: None, None
-                    size: dp(28), dp(28)
+                    size: dp(36), dp(36)
                     pos_hint: {"center_x": 0.5}
                     on_release: root.open_search()
 
                 MDLabel:
                     text: "便签检索"
-                    font_style: "Overline"
+                    font_style: "Caption"
                     halign: "center"
                     size_hint_y: None
-                    height: dp(16)
+                    height: dp(18)
 
             MDBoxLayout:
                 orientation: "vertical"
@@ -115,16 +115,16 @@ KV = """
                 MDIconButton:
                     icon: "tag-multiple"
                     size_hint: None, None
-                    size: dp(28), dp(28)
+                    size: dp(36), dp(36)
                     pos_hint: {"center_x": 0.5}
                     on_release: root.open_tag_manager()
 
                 MDLabel:
                     text: "标签"
-                    font_style: "Overline"
+                    font_style: "Caption"
                     halign: "center"
                     size_hint_y: None
-                    height: dp(16)
+                    height: dp(18)
 
             MDBoxLayout:
                 orientation: "vertical"
@@ -136,16 +136,16 @@ KV = """
                 MDIconButton:
                     icon: "cog"
                     size_hint: None, None
-                    size: dp(28), dp(28)
+                    size: dp(36), dp(36)
                     pos_hint: {"center_x": 0.5}
                     on_release: root.open_settings()
 
                 MDLabel:
                     text: "设置"
-                    font_style: "Overline"
+                    font_style: "Caption"
                     halign: "center"
                     size_hint_y: None
-                    height: dp(16)
+                    height: dp(18)
 
         MDBoxLayout:
             id: search_bar
@@ -165,7 +165,7 @@ KV = """
             MDIconButton:
                 icon: "close"
                 size_hint: None, None
-                size: dp(24), dp(24)
+                size: dp(28), dp(28)
                 on_release: root.clear_search()
 
         ScrollView:
@@ -260,7 +260,8 @@ KV = """
 
     MDFloatingActionButton:
         icon: "plus"
-        pos_hint: {"right": 0.9, "y": 0.08}
+        x: root.width - self.width - dp(16)
+        y: dp(16)
         on_release: root.open_add_dialog()
 """
 

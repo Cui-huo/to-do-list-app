@@ -55,7 +55,7 @@ KV = """
                     id: pin_btn
                     icon: "pin-outline"
                     size_hint: None, None
-                    size: dp(32), dp(32)
+                    size: dp(40), dp(40)
                     on_release: root.dispatch("on_pin_toggle")
 
             MDLabel:
@@ -74,13 +74,13 @@ KV = """
                 orientation: "horizontal"
                 spacing: dp(4)
                 size_hint_y: None
-                height: dp(32) if root.tag_names else 0
+                height: dp(36) if root.tag_names else 0
                 adaptive_width: True
 
             MDBoxLayout:
                 orientation: "horizontal"
                 size_hint_y: None
-                height: dp(36)
+                height: dp(44)
                 spacing: dp(4)
                 pos_hint: {"right": 1}
 
@@ -88,19 +88,19 @@ KV = """
                     id: complete_btn
                     icon: "check-circle"
                     size_hint: None, None
-                    size: dp(32), dp(32)
+                    size: dp(40), dp(40)
                     on_release: root.dispatch("on_complete_toggle")
 
                 MDIconButton:
                     icon: "pencil"
                     size_hint: None, None
-                    size: dp(32), dp(32)
+                    size: dp(40), dp(40)
                     on_release: root.dispatch("on_edit")
 
                 MDIconButton:
                     icon: "delete"
                     size_hint: None, None
-                    size: dp(32), dp(32)
+                    size: dp(40), dp(40)
                     theme_icon_color: "Error"
                     on_release: root.dispatch("on_delete")
 """
@@ -143,10 +143,15 @@ class NoteCard(MDCard, TouchBehavior):
             chip = MDChip(
                 text=name,
                 size_hint=(None, None),
-                height=28,
+                size=(dp(90), dp(32)),
                 md_bg_color=(0.9, 0.9, 0.9, 1),
                 text_color=(0.3, 0.3, 0.3, 1),
             )
+            # 文字超出时截断（R8 边界显式）
+            if hasattr(chip, 'ids') and 'label' in chip.ids:
+                chip.ids.label.shorten = True
+                chip.ids.label.shorten_from = 'right'
+                chip.ids.label.text_size = (dp(82), None)
             chips_box.add_widget(chip)
 
     def _apply_visual_state(self):
