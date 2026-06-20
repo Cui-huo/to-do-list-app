@@ -1,13 +1,16 @@
 """对话框：新增/编辑便签 + 确认删除。"""
 
+from kivy.clock import Clock
 from kivy.lang import Builder
+from kivy.metrics import dp
 from kivy.properties import ObjectProperty
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.dialog import MDDialog
 from kivymd.uix.button import MDFlatButton
 from kivymd.uix.textfield import MDTextField
 from kivymd.uix.label import MDLabel
-from kivymd.uix.chip import MDChip
+from kivymd.uix.chip import MDChip, MDChipText
+from app_tool.config import MAX_TAGS_PER_NOTE
 
 KV = """
 <AddEditContent>:
@@ -54,6 +57,14 @@ KV = """
             size_hint_x: None
             width: self.minimum_width
             adaptive_width: True
+
+    MDLabel:
+        id: tag_limit_hint
+        text: ""
+        font_style: "Caption"
+        theme_text_color: "Error"
+        size_hint_y: None
+        height: 0
 """
 
 Builder.load_string(KV)
@@ -90,12 +101,11 @@ class AddEditContent(MDBoxLayout):
             bg = (0.9, 0.9, 0.9, 1)
             tc = (0.3, 0.3, 0.3, 1)
         chip = MDChip(
-            text=name,
             size_hint=(None, None),
-            height=32,
+            size=(dp(90), dp(32)),
             md_bg_color=bg,
-            text_color=tc,
         )
+        chip.add_widget(MDChipText(text=name, color=tc))
         chip.bind(on_press=lambda c, n=name: self._toggle_tag(n))
         return chip
 
@@ -103,8 +113,17 @@ class AddEditContent(MDBoxLayout):
         if name in self._selected_tags:
             self._selected_tags.discard(name)
         else:
+            if len(self._selected_tags) >= MAX_TAGS_PER_NOTE:
+                self.ids.tag_limit_hint.text = f"每个便签最多 {MAX_TAGS_PER_NOTE} 个标签"
+                self.ids.tag_limit_hint.height = dp(18)
+                Clock.schedule_once(lambda dt: self._clear_tag_hint(), 2)
+                return
             self._selected_tags.add(name)
         self.set_all_tags(self._all_tags)
+
+    def _clear_tag_hint(self):
+        self.ids.tag_limit_hint.text = ""
+        self.ids.tag_limit_hint.height = 0
 
 
 def build_add_edit_dialog(

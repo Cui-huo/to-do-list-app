@@ -78,7 +78,8 @@ KV = """
                     on_release: root.toggle_sort_preference()
 
                 MDLabel:
-                    text: "便签排序"
+                    id: sort_label
+                    text: "按更新时间"
                     font_style: "Caption"
                     halign: "center"
                     size_hint_y: None
@@ -285,6 +286,7 @@ class MainScreen(MDScreen):
 
     def on_enter(self, *args):
         self.refresh_list()
+        self._update_sort_label()
 
     def _load_username(self):
         from kivymd.app import MDApp
@@ -361,8 +363,8 @@ class MainScreen(MDScreen):
 
         if self._current_search_params:
             notes = search_svc.search(**self._current_search_params)
-            incomplete_notes = notes
-            completed_notes = []
+            incomplete_notes = [n for n in notes if not n.is_completed]
+            completed_notes = [n for n in notes if n.is_completed]
         else:
             incomplete_notes = note_svc.get_incomplete()
             completed_notes = note_svc.get_completed()
@@ -541,18 +543,24 @@ class MainScreen(MDScreen):
 
     # ── 排序 ──
 
+    def _update_sort_label(self):
+        note_svc, _, _ = self._get_services()
+        current = note_svc._get_sort_preference()
+        if current == "updated_at":
+            self.ids.sort_label.text = "按更新时间"
+            self.ids.func_sort_icon.icon = "sort-clock-ascending"
+        else:
+            self.ids.sort_label.text = "按创建时间"
+            self.ids.func_sort_icon.icon = "sort-calendar-ascending"
+
     def toggle_sort_preference(self):
         note_svc, _, _ = self._get_services()
         current = note_svc._get_sort_preference()
         new_pref = "created_at" if current == "updated_at" else "updated_at"
         note_svc.set_sort_preference(new_pref)
-        label = "按更新时间" if new_pref == "updated_at" else "按创建时间"
-        self.ids.func_sort_icon.icon = (
-            "sort-clock-ascending" if new_pref == "updated_at"
-            else "sort-calendar-ascending"
-        )
+        self._update_sort_label()
         self.refresh_list()
-        self._toast(f"排序切换：{label}")
+        self._toast(f"排序切换：{self.ids.sort_label.text}")
 
     # ── 已完成区折叠 ──
 

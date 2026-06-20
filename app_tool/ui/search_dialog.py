@@ -10,7 +10,7 @@ from kivymd.uix.dialog import MDDialog
 from kivymd.uix.button import MDFlatButton
 from kivymd.uix.textfield import MDTextField
 from kivymd.uix.label import MDLabel
-from kivymd.uix.chip import MDChip
+from kivymd.uix.chip import MDChip, MDChipText
 from kivymd.uix.menu import MDDropdownMenu
 
 KV = """
@@ -223,25 +223,29 @@ class SearchContent(MDBoxLayout):
         box.clear_widgets()
 
         created_chip = MDChip(
-            text="创建时间",
             size_hint=(None, None),
             height=32,
             md_bg_color=(0.25, 0.32, 0.71, 1) if self.time_type == "创建时间"
             else (0.9, 0.9, 0.9, 1),
-            text_color=(1, 1, 1, 1) if self.time_type == "创建时间"
-            else (0.3, 0.3, 0.3, 1),
         )
+        created_chip.add_widget(MDChipText(
+            text="创建时间",
+            color=(1, 1, 1, 1) if self.time_type == "创建时间"
+            else (0.3, 0.3, 0.3, 1),
+        ))
         created_chip.bind(on_press=lambda *_: self._set_time_type("创建时间"))
 
         completed_chip = MDChip(
-            text="完成时间",
             size_hint=(None, None),
             height=32,
             md_bg_color=(0.25, 0.32, 0.71, 1) if self.time_type == "完成时间"
             else (0.9, 0.9, 0.9, 1),
-            text_color=(1, 1, 1, 1) if self.time_type == "完成时间"
-            else (0.3, 0.3, 0.3, 1),
         )
+        completed_chip.add_widget(MDChipText(
+            text="完成时间",
+            color=(1, 1, 1, 1) if self.time_type == "完成时间"
+            else (0.3, 0.3, 0.3, 1),
+        ))
         completed_chip.bind(on_press=lambda *_: self._set_time_type("完成时间"))
 
         box.add_widget(created_chip)
@@ -271,12 +275,11 @@ class SearchContent(MDBoxLayout):
             bg = (0.9, 0.9, 0.9, 1)
             tc = (0.3, 0.3, 0.3, 1)
         chip = MDChip(
-            text=name,
             size_hint=(None, None),
-            height=32,
+            size=(dp(90), dp(32)),
             md_bg_color=bg,
-            text_color=tc,
         )
+        chip.add_widget(MDChipText(text=name, color=tc))
         chip.bind(on_press=lambda c, n=name: self._toggle_tag(n))
         return chip
 

@@ -8,7 +8,7 @@ from kivy.properties import (
 )
 from kivymd.uix.card import MDCard
 from kivymd.uix.behaviors import TouchBehavior
-from kivymd.uix.chip import MDChip
+from kivymd.uix.chip import MDChip, MDChipText
 from kivymd.uix.label import MDLabel
 from kivymd.uix.button import MDIconButton
 
@@ -124,6 +124,7 @@ class NoteCard(MDCard, TouchBehavior):
         super().__init__(**kwargs)
         self.duration_long_touch = 1.0
         Clock.schedule_once(lambda dt: self._apply_visual_state(), 0)
+        Clock.schedule_once(lambda dt: self.on_tag_names(None, self.tag_names), 0)
 
     def on_is_completed(self, instance, value):
         if self.ids:
@@ -141,17 +142,15 @@ class NoteCard(MDCard, TouchBehavior):
         chips_box.clear_widgets()
         for name in value:
             chip = MDChip(
-                text=name,
                 size_hint=(None, None),
                 size=(dp(90), dp(32)),
                 md_bg_color=(0.9, 0.9, 0.9, 1),
-                text_color=(0.3, 0.3, 0.3, 1),
             )
-            # 文字超出时截断（R8 边界显式）
-            if hasattr(chip, 'ids') and 'label' in chip.ids:
-                chip.ids.label.shorten = True
-                chip.ids.label.shorten_from = 'right'
-                chip.ids.label.text_size = (dp(82), None)
+            label = MDChipText(text=name, color=(0.3, 0.3, 0.3, 1))
+            label.shorten = True
+            label.shorten_from = 'right'
+            label.text_size = (dp(82), None)
+            chip.add_widget(label)
             chips_box.add_widget(chip)
 
     def _apply_visual_state(self):

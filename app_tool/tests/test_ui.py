@@ -168,8 +168,8 @@ class TestDialogScrollViewHeight:
         """AddEditContent 标签 ScrollView 高度应为 56dp"""
         from app_tool.ui.dialogs import AddEditContent
         content = AddEditContent()
-        # KV 中 ScrollView 是最后一个子元素，在 children[0]
-        sv = content.children[0]
+        # KV 末尾: ScrollView, tag_limit_hint → children[1] = ScrollView
+        sv = content.children[1]
         assert sv.height == pytest.approx(56, abs=1), \
             f"对话框标签 ScrollView 高度期望 56dp，实际 {sv.height}"
 
