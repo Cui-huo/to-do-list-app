@@ -25,8 +25,8 @@
 | 新增便签 | 卡片从 FAB 位置放大弹出到列表顶部 | 0.3s |
 | 标记完成 | 卡片透明度 1→0.4 + 向已完成区下沉滑动 | 0.3s，动画结束后刷新列表 |
 | 取消完成 | 卡片透明度 0.4→1 + 从未完成区顶部插入 | 0.25s |
-| 删除便签 | 卡片向右滑出 + 淡出 | 0.2s，滑出后 UndoBar 从底部升起 |
-| 撤销删除 | 新卡片从 UndoBar 位置弹出到列表顶部 | 0.3s |
+| 删除便签 | 卡片向右滑出 + 淡出 | 0.2s，滑出后顶栏右侧显示[撤销]按钮 |
+| 撤销删除 | 新卡片恢复到列表原位置 | 0.3s |
 | 拖拽排序 | 拖动时卡片抬起阴影 + 其他卡片实时让位 | 实时（0 延迟） |
 | 置顶/取消置顶 | 卡片瞬移到目标区（无动画，避免混淆） | — |
 | 展开已完成区 | 已完成区从折叠态向下展开 | 0.25s |
@@ -105,8 +105,8 @@ Android 卡片式便签应用。Kivy + KivyMD 构建 UI，SQLite 本地存储，
 | 取消完成 | is_completed=1 | is_completed=0, completed_at=NULL | 卡片透明度 0.4→1 + 从未完成区顶部插入 0.25s | is_completed 已为 0 → 不显示[取消完成]按钮（UI 层拦截） |
 | 手动置顶 | is_pinned=0 | is_pinned=1, pinned_at=now | 卡片瞬移到列表顶部（无动画） | is_pinned 已为 1 → Toast "该便签已置顶" |
 | 取消手动置顶 | is_pinned=1 | is_pinned=0, pinned_at=NULL | 卡片移回原位 | is_pinned 已为 0 → 长按菜单不显示[取消置顶] |
-| 删除便签 | — | 物理删除 + 级联删除 NoteTag/Reminder/FTS5 索引 | 卡片右滑淡出 0.2s，UndoBar 从底部升起 | — |
-| 撤销删除 | 撤销缓存中有数据且未超时 | 新便签恢复原数据，撤销缓存清空 | 新卡片从 UndoBar 位置弹出到列表顶部 0.3s | 缓存为空/超时 → UndoBar 消失；首次删除时 Toast "撤销仅在应用运行期间有效" |
+| 删除便签 | — | 物理删除 + 级联删除 NoteTag/Reminder/FTS5 索引 | 卡片右滑淡出 0.2s，顶栏右侧显示[撤销]按钮 + Toast(2s) "应用未关闭的12小时内，可以撤销最近1条删除" | — |
+| 撤销删除 | 撤销缓存中有数据且未超时 | 新便签恢复原数据，撤销缓存清空 | 新卡片恢复到列表原位置 + Toast(2s) "便签已恢复" | 缓存为空/超时 → 撤销按钮不可见 |
 | 删除标签 | — | 级联删除 NoteTag；若在置顶列表中自动移除 | 标签从列表移除 | — |
 
 > 其他明确不做的事项见 [§6 明确不做](#6-明确不做explicit-non-goals)。
@@ -198,26 +198,28 @@ Android 卡片式便签应用。Kivy + KivyMD 构建 UI，SQLite 本地存储，
 
 ```
 输入：note_id(内部) — 用户点击删除按钮 → 确认框 → [确认删除]
-校验：前端弹出确认框「是否删除？」（R3 安全确认）；后端无额外校验
+校验：前端弹出确认框「确认删除此便签吗？」（R3 安全确认）；后端无额外校验
 输出：(True, None) | (False, "错误信息字符串")
 副作用：
   - 内存暂存当前便签数据（title/content/tag_names），覆盖上次暂存
   - 物理删除 Note + 级联 NoteTag、Reminder、FTS5
-  - UI 底部弹出 UndoBar：「为防止误删，应用关闭前 12 小时内可恢复最后一条  [撤销]」
-  - 应用关闭或 12 小时后暂存清空，UndoBar 自动消失
+  - 顶栏右侧显示[撤销]按钮（金色 undo 图标）
+  - Toast(2s) "应用未关闭的12小时内，可以撤销最近1条删除"
+  - 应用关闭或 12 小时后暂存清空，撤销按钮消失
   - 写入日志（INFO 级别）
 ```
 
 #### 撤销删除
 
 ```
-输入：无（用户点击 UndoBar [撤销] 按钮）
+输入：无（用户点击顶栏右侧 [撤销] 按钮）
 校验：内存中有暂存数据且未超时（12h）且应用未被关闭；无暂存时按钮不可见
 输出：(True, 新建的 Note 对象) | (False, "错误信息字符串")
 副作用：
   - 创建新便签（title=原标题，content=原内容，tags=原标签名列表）
   - 清除内存暂存数据
-  - UndoBar 消失
+  - 撤销按钮隐藏
+  - Toast(2s) "便签已恢复"
   - 写入日志（INFO 级别）
 ```
 
@@ -227,7 +229,7 @@ Android 卡片式便签应用。Kivy + KivyMD 构建 UI，SQLite 本地存储，
 输入：无（自动触发）
 校验：暂存时间 > 12h 或 应用关闭
 输出：(True, None)
-副作用：内存暂存数据清空，UndoBar 消失
+副作用：内存暂存数据清空，撤销按钮消失
 ```
 
 #### 标记完成
@@ -431,7 +433,7 @@ CREATE INDEX idx_reminder_remind_at ON Reminder(remind_at);
 
 | 屏幕/组件 | KivyMD 组件 | 职责 |
 |---|---|---|
-| `MainScreen` | `MDTopAppBar` + `MDFloatingActionButton` + `RecycleView` + `UndoBar` | 主界面 + 排序切换 + 撤销提示条 |
+| `MainScreen` | `MDTopAppBar` + `MDFloatingActionButton` + `ScrollView` + 撤销按钮 | 主界面 + 排序切换 + 撤销提示 |
 | `NoteCard` | `MDCard` + `MDLabel` + `MDChip`×3 + `MDIconButton`×6 | 便签卡片：长按置顶 / 拖拽 / 标题 / 内容 / 标签芯片(MDChip)×最多3个 / 提醒⏰ / 编辑 / 完成 / 删除 |
 | `AddEditDialog` | `MDDialog` + `MDTextField`×2 + `MDChip` | 新增/编辑弹窗 |
 | `SearchFilter` | `MDTextField` + `MDDropDownItem`×3 + `MDChip` | 搜索面板 |
@@ -439,7 +441,7 @@ CREATE INDEX idx_reminder_remind_at ON Reminder(remind_at);
 | `ReminderScreen` | `MDTopAppBar` + `MDList` + `MDIconButton` | 提醒管理页：已设提醒列表 / [+新建提醒] 按钮（触发 MDDatePicker + MDTimePicker Dialog）/ [✕删除] |
 | `SettingsScreen` | `MDSwitch` + `MDTextField` | 设置页 |
 
-导航：`MDScreenManager` → 主屏 / 设置 / 提醒；从便签卡片提醒按钮进入 ReminderScreen；UndoBar 在主屏底部弹出。
+导航：`MDScreenManager` → 主屏 / 设置 / 提醒；从便签卡片提醒按钮进入 ReminderScreen；撤销按钮在顶栏右侧显示。
 
 ---
 
@@ -481,8 +483,8 @@ app_tool/tests/
 - [ ] 长按便签 → 手动置顶/取消置顶；重复置顶提示失败
 - [ ] 标签管理页：点击改名 / 📌置顶（超3自动淘汰）/ +新建 / 批量删除
 - [ ] 编辑 → updated_at 刷新
-- [ ] 删除 → 确认框 → 物理删除；底部弹出 UndoBar（12h 或应用关闭后消失）
-- [ ] 撤销 → 创建新便签（原标题 + 原内容 + 原标签）+ UndoBar 消失
+- [ ] 删除 → 确认框 → 物理删除；顶栏右侧显示[撤销]按钮 + Toast(2s) "应用未关闭的12小时内，可以撤销最近1条删除"
+- [ ] 撤销 → 创建新便签（原标题 + 原内容 + 原标签）+ 撤销按钮隐藏 + Toast(2s) "便签已恢复"
 - [ ] 标签 → 增删改 + 删除确认框 + 置顶
 - [ ] 搜索：关键词 + 标签 + 年/月/周 + 时间类型组合 AND
 - [ ] 提醒：便签卡片提醒按钮 → ReminderScreen → 创建/删除提醒 → 系统闹钟触发

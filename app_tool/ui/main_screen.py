@@ -1,4 +1,4 @@
-"""主界面：便签列表 + FAB + UndoBar + 排序切换 + 用户名编辑。"""
+"""主界面：便签列表 + FAB + 排序切换 + 用户名编辑。"""
 
 from kivy.lang import Builder
 from kivy.metrics import dp
@@ -22,37 +22,55 @@ KV = """
     MDBoxLayout:
         orientation: "vertical"
 
-        MDTopAppBar:
-            id: top_bar
-            type: "top"
-            anchor_title: "left"
+        FloatLayout:
+            size_hint_y: None
+            height: dp(56)
 
-            MDBoxLayout:
-                id: title_box
-                orientation: "horizontal"
-                spacing: 0
-                adaptive_width: True
-                pos_hint: {"center_y": 0.5}
+            MDTopAppBar:
+                id: top_bar
+                type: "top"
+                anchor_title: "left"
+                pos_hint: {"x": 0, "y": 0}
+                size_hint: 1, 1
 
-                MDLabel:
-                    id: username_btn
-                    text: root.username or "某某"
-                    font_style: "Subtitle2"
-                    theme_text_color: "Custom"
-                    text_color: (1, 0.85, 0.4, 1)
+                MDBoxLayout:
+                    id: title_box
+                    orientation: "horizontal"
+                    spacing: 0
                     adaptive_width: True
-                    size_hint_y: None
-                    height: self.texture_size[1]
-                    on_touch_down: if self.collide_point(*args[1].pos) and not self.disabled: root.edit_username()
+                    pos_hint: {"center_y": 0.5}
 
-                MDLabel:
-                    text: "的专属便签本"
-                    font_style: "Subtitle2"
-                    theme_text_color: "Custom"
-                    text_color: (1, 1, 1, 1)
-                    adaptive_width: True
-                    size_hint_y: None
-                    height: self.texture_size[1]
+                    MDLabel:
+                        id: username_btn
+                        text: root.username or "某某"
+                        font_style: "Subtitle2"
+                        theme_text_color: "Custom"
+                        text_color: (1, 0.85, 0.4, 1)
+                        adaptive_width: True
+                        size_hint_y: None
+                        height: self.texture_size[1]
+                        on_touch_down: if self.collide_point(*args[1].pos) and not self.disabled: root.edit_username()
+
+                    MDLabel:
+                        text: "的专属便签本"
+                        font_style: "Subtitle2"
+                        theme_text_color: "Custom"
+                        text_color: (1, 1, 1, 1)
+                        adaptive_width: True
+                        size_hint_y: None
+                        height: self.texture_size[1]
+
+            MDIconButton:
+                id: undo_btn
+                icon: "undo"
+                size_hint: None, None
+                size: dp(40), dp(40)
+                pos_hint: {"right": 1, "center_y": 0.5}
+                opacity: 0
+                disabled: True
+                theme_icon_color: "Custom"
+                icon_color: (1, 0.85, 0.4, 1)
+                on_release: root.undo_delete()
 
         MDBoxLayout:
             id: func_row
@@ -239,35 +257,6 @@ KV = """
                     size_hint_y: None
                     height: dp(72)
 
-        MDBoxLayout:
-            id: undo_bar
-            orientation: "horizontal"
-            size_hint_y: None
-            height: 0
-            md_bg_color: (0.2, 0.2, 0.2, 0.95)
-            padding: dp(12), dp(8)
-            spacing: dp(8)
-            radius: dp(8), dp(8), 0, 0
-
-            MDLabel:
-                text: "便签已删除。点击撤销恢复。"
-                theme_text_color: "Custom"
-                text_color: (1, 1, 1, 1)
-                font_style: "Body2"
-                size_hint_x: 0.7
-
-            MDFlatButton:
-                text: "撤销"
-                theme_text_color: "Custom"
-                text_color: (0.4, 0.8, 1, 1)
-                on_release: root.undo_delete()
-
-            MDFlatButton:
-                text: "关闭"
-                theme_text_color: "Custom"
-                text_color: (0.6, 0.6, 0.6, 1)
-                on_release: root.dismiss_undo()
-
     MDFloatingActionButton:
         icon: "plus"
         x: root.width - self.width - dp(16)
@@ -281,7 +270,6 @@ Builder.load_string(KV)
 class MainScreen(MDScreen):
     incomplete_box = ObjectProperty(None)
     completed_box = ObjectProperty(None)
-    undo_bar = ObjectProperty(None)
     search_bar = ObjectProperty(None)
     search_label = ObjectProperty(None)
     completed_label = ObjectProperty(None)
@@ -411,7 +399,7 @@ class MainScreen(MDScreen):
             card = self._build_note_card(note)
             self.ids.completed_box.add_widget(card)
 
-        self._update_undo_bar()
+        self._update_undo_btn_visibility()
         self._update_completed_visibility()
 
     def _build_note_card(self, note) -> NoteCard:
@@ -548,40 +536,14 @@ class MainScreen(MDScreen):
         return super().on_touch_up(touch)
 
     def _toast(self, text: str):
-        from kivy.animation import Animation
         from kivymd.uix.label import MDLabel
-        from kivymd.uix.card import MDCard
+        from kivymd.uix.snackbar import MDSnackbar
 
-        toast_bg = list(self.theme_cls.bg_darkest)
-        toast_bg[3] = 0.95
-        card = MDCard(
-            size_hint=(None, None),
-            size=(self.width - dp(32), dp(48)),
-            pos=(dp(16), dp(80)),
-            md_bg_color=toast_bg,
-            radius=(dp(8), dp(8), dp(8), dp(8)),
-            opacity=0,
-            padding=(dp(16), dp(12), dp(16), dp(12)),
-        )
-        label = MDLabel(
-            text=text,
-            theme_text_color="Custom",
-            text_color=(1, 1, 1, 1),
-            font_style="Body2",
-            halign="center",
-            adaptive_height=True,
-            size_hint_y=None,
-        )
-        card.add_widget(label)
-        # 等 label 渲染后再根据实际高度调整 card
-        label.bind(
-            texture_size=lambda lbl, ts: setattr(card, "height", ts[1] + dp(24))
-        )
-        self.add_widget(card)
-
-        anim = Animation(opacity=1, duration=0.15) + Animation(opacity=1, duration=1.5) + Animation(opacity=0, duration=0.2)
-        anim.bind(on_complete=lambda *_: self.remove_widget(card))
-        anim.start(card)
+        MDSnackbar(
+            MDLabel(text=text, font_style="Body2"),
+            duration=2,
+            pos_hint={"center_x": 0.5, "center_y": 0.5},
+        ).open()
 
     # ── 操作处理 ──
 
@@ -672,25 +634,25 @@ class MainScreen(MDScreen):
         note = note_svc.get_by_id(card.note_id)
 
         def on_confirm():
-            if note_svc.get_undo_info() is None:
-                self._toast("撤销仅在应用运行期间有效")
             note_svc.delete(card.note_id)
             self.refresh_list()
+            self._toast("应用未关闭的12小时内，可以撤销最近1条删除")
 
         dialog = build_confirm_dialog(
             title="删除便签",
-            message=f"确认删除便签「{note.title or '无标题'}」？\n可在 12 小时内撤销。",
+            message="确认删除此便签吗？",
             on_confirm=on_confirm,
             confirm_text="确认删除",
         )
         dialog.open()
 
-    # ── UndoBar ──
+    # ── 撤销按钮 ──
 
-    def _update_undo_bar(self):
+    def _update_undo_btn_visibility(self):
         note_svc, _, _ = self._get_services()
         info = note_svc.get_undo_info()
-        self.ids.undo_bar.height = dp(48) if info else 0
+        self.ids.undo_btn.opacity = 1 if info else 0
+        self.ids.undo_btn.disabled = not bool(info)
 
     def undo_delete(self):
         note_svc, _, _ = self._get_services()
@@ -698,11 +660,6 @@ class MainScreen(MDScreen):
         if note:
             self.refresh_list()
             self._toast("便签已恢复")
-
-    def dismiss_undo(self):
-        note_svc, _, _ = self._get_services()
-        note_svc.clear_undo()
-        self.ids.undo_bar.height = 0
 
     # ── 排序 ──
 
