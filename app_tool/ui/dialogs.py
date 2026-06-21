@@ -95,11 +95,11 @@ class AddEditContent(MDBoxLayout):
 
     def _make_chip(self, name: str, selected: bool):
         if selected:
-            bg = (0.25, 0.32, 0.71, 1)
+            bg = self.theme_cls.primary_color
             tc = (1, 1, 1, 1)
         else:
-            bg = (0.9, 0.9, 0.9, 1)
-            tc = (0.3, 0.3, 0.3, 1)
+            bg = self.theme_cls.bg_light
+            tc = self.theme_cls.text_color
         chip = MDChip(
             size_hint=(None, None),
             size=(dp(90), dp(32)),

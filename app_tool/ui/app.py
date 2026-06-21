@@ -49,19 +49,25 @@ class NotesApp(MDApp):
         self.tag_service: TagService | None = None
         self.search_service: SearchService | None = None
         self.reminder_service: ReminderService | None = None
+        self.settings_service: SettingsService | None = None
 
     def build(self):
         self.theme_cls.primary_palette = "Indigo"
-        self.theme_cls.theme_style = "Light"
         Window.size = (420, 740)
 
-        # 数据库初始化
+        # 数据库初始化（需在读取主题偏好之前）
         self.db_path = os.path.join(self.user_data_dir, DB_FILENAME)
         os.makedirs(self.user_data_dir, exist_ok=True)
         self.db_conn = sqlite3.connect(self.db_path)
         self.db_conn.row_factory = sqlite3.Row
         self.db_conn.execute("PRAGMA foreign_keys = ON")
         init_db(self.db_conn)
+
+        # 持久化主题偏好（R9）
+        from app_tool.controller.settings_service import SettingsService
+        self.settings_service = SettingsService(self.db_conn)
+        _, theme = self.settings_service.get_dark_mode()
+        self.theme_cls.theme_style = theme
 
         # 服务初始化
         self.note_service = NoteService(self.db_conn)

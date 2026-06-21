@@ -70,4 +70,12 @@
 - ❌ 错误提示 `sqlite3.IntegrityError: UNIQUE constraint failed: tag.name`
 - ✅ 错误提示 "标签「工作」已存在，请使用其他名称"
 
+### R31. 对齐优先同类型 — 对齐问题优先统一组件类型
+同行两个组件垂直不对齐时，优先将两侧改为同类型组件（如都是 Label、都是 Button），而非调整 padding / pos_hint / y 偏移。
+- ❌ `MDLabel` + `MDIconButton` 高度不一致 → 反复调 padding / 加 pos_hint 微调
+- ❌ `MDLabel` + `MDFlatButton` 高度不一致 → 内边距不同，调了按钮又偏
+- ✅ 两侧都用 `MDLabel`（文字渲染基线天然一致）
+
+**Why:** 不同类型组件的内部布局策略不同（Label 无内边距 vs Button 有默认 padding，Icon 用图标字体基线 vs Label 用文本基线），微调偏移只能暴力对齐当前尺寸，换设备/换字体后又会错位。同类型组件共享同一套渲染规则，天然对齐。
+
 ---

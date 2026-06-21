@@ -222,29 +222,30 @@ class SearchContent(MDBoxLayout):
         box = self.ids.time_type_box
         box.clear_widgets()
 
+        active_bg = self.theme_cls.primary_color
+        active_tc = (1, 1, 1, 1)
+        inactive_bg = self.theme_cls.bg_light
+        inactive_tc = self.theme_cls.text_color
+
         created_chip = MDChip(
             size_hint=(None, None),
             height=32,
-            md_bg_color=(0.25, 0.32, 0.71, 1) if self.time_type == "创建时间"
-            else (0.9, 0.9, 0.9, 1),
+            md_bg_color=active_bg if self.time_type == "创建时间" else inactive_bg,
         )
         created_chip.add_widget(MDChipText(
             text="创建时间",
-            color=(1, 1, 1, 1) if self.time_type == "创建时间"
-            else (0.3, 0.3, 0.3, 1),
+            color=active_tc if self.time_type == "创建时间" else inactive_tc,
         ))
         created_chip.bind(on_press=lambda *_: self._set_time_type("创建时间"))
 
         completed_chip = MDChip(
             size_hint=(None, None),
             height=32,
-            md_bg_color=(0.25, 0.32, 0.71, 1) if self.time_type == "完成时间"
-            else (0.9, 0.9, 0.9, 1),
+            md_bg_color=active_bg if self.time_type == "完成时间" else inactive_bg,
         )
         completed_chip.add_widget(MDChipText(
             text="完成时间",
-            color=(1, 1, 1, 1) if self.time_type == "完成时间"
-            else (0.3, 0.3, 0.3, 1),
+            color=active_tc if self.time_type == "完成时间" else inactive_tc,
         ))
         completed_chip.bind(on_press=lambda *_: self._set_time_type("完成时间"))
 
@@ -269,11 +270,11 @@ class SearchContent(MDBoxLayout):
 
     def _make_chip(self, name: str, selected: bool):
         if selected:
-            bg = (0.25, 0.32, 0.71, 1)
+            bg = self.theme_cls.primary_color
             tc = (1, 1, 1, 1)
         else:
-            bg = (0.9, 0.9, 0.9, 1)
-            tc = (0.3, 0.3, 0.3, 1)
+            bg = self.theme_cls.bg_light
+            tc = self.theme_cls.text_color
         chip = MDChip(
             size_hint=(None, None),
             size=(dp(90), dp(32)),

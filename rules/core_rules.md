@@ -170,6 +170,14 @@ AI 仅允许生成 `spec.md` 和 `rules.md` 中明确定义的功能代码。不
 - ❌ AI 擅自选择"静默跳过不存在的标签"而未确认是跳过还是报错
 - ❌ AI 自行添加"便签历史版本记录"功能（Spec 未定义）
 
+### R30. Bug 修复全局排查 — 同类错误一次修完
+修复 bug 时，禁止只修复报错点。必须用 grep 搜索整个代码库，找出所有同类错误模式，一次性全部修复。
+
+- ❌ `_update_theme_colors()` 报 `NameError: MDApp` → 只在这一个方法加 import
+- ✅ `_update_theme_colors()` 报错 → grep 全项目 `MDApp.get_running_app()`，检查每处是否有对应 import，发现另一文件同样缺 import，一起修复
+
+**How to apply:** 定位 bug 根因后，提取错误模式（如"方法内调用 X 但缺少 import"），grep 全局所有相同调用点，逐处验证，批量修复。
+
 ---
 
 ## 五、可观测性与运维层规则
@@ -221,3 +229,4 @@ AI 仅允许生成 `spec.md` 和 `rules.md` 中明确定义的功能代码。不
 | R27 | 测试数据库隔离 | :memory: / tmp | 测试与质量保障层 |
 | R28 | 关键操作日志 | 可观测性 | 可观测性层 |
 | R29 | 时间戳竞争修复 | time.sleep | 测试与质量保障层 |
+| R30 | Bug修复全局排查 | 同类一次修完 | AI行为约束层 |

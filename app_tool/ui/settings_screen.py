@@ -12,7 +12,6 @@ from kivymd.uix.toolbar import MDTopAppBar
 
 KV = """
 <SettingsScreen>:
-    md_bg_color: (0.96, 0.96, 0.98, 1)
 
     MDBoxLayout:
         orientation: "vertical"
@@ -130,22 +129,34 @@ class SettingsScreen(MDScreen):
 
         self.ids.dark_mode_switch.active = (app.theme_cls.theme_style == "Dark")
 
+        inactive_bg = app.theme_cls.bg_light
+        inactive_text = app.theme_cls.text_color
+
         pref = note_svc._get_sort_preference()
         if pref == "created_at":
             self.ids.sort_created_btn.md_bg_color = app.theme_cls.primary_color
             self.ids.sort_created_btn.text_color = (1, 1, 1, 1)
-            self.ids.sort_updated_btn.md_bg_color = (0.9, 0.9, 0.9, 1)
-            self.ids.sort_updated_btn.text_color = (0, 0, 0, 1)
+            self.ids.sort_updated_btn.md_bg_color = inactive_bg
+            self.ids.sort_updated_btn.text_color = inactive_text
         else:
             self.ids.sort_updated_btn.md_bg_color = app.theme_cls.primary_color
             self.ids.sort_updated_btn.text_color = (1, 1, 1, 1)
-            self.ids.sort_created_btn.md_bg_color = (0.9, 0.9, 0.9, 1)
-            self.ids.sort_created_btn.text_color = (0, 0, 0, 1)
+            self.ids.sort_created_btn.md_bg_color = inactive_bg
+            self.ids.sort_created_btn.text_color = inactive_text
 
     def toggle_dark_mode(self, switch, active):
         from kivymd.app import MDApp
         app = MDApp.get_running_app()
-        app.theme_cls.theme_style = "Dark" if active else "Light"
+        new_theme = "Dark" if active else "Light"
+        app.theme_cls.theme_style = new_theme
+        app.settings_service.set_dark_mode(new_theme)
+        self._update_theme_colors()
+        self._load_settings()
+
+    def _update_theme_colors(self):
+        from kivymd.app import MDApp
+        theme = MDApp.get_running_app().theme_cls
+        self.md_bg_color = theme.bg_normal
 
     def set_sort_updated(self):
         note_svc, _ = self._get_services()

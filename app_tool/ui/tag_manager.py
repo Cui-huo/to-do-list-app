@@ -18,7 +18,6 @@ from app_tool.config import MAX_TAG_NAME_LENGTH
 
 KV = """
 <TagManagerScreen>:
-    md_bg_color: (0.96, 0.96, 0.98, 1)
 
     MDBoxLayout:
         orientation: "vertical"
@@ -74,6 +73,8 @@ class TagManagerScreen(MDScreen):
         self._selected_tags: set[str] = set()
 
     def on_enter(self, *args):
+        from kivymd.app import MDApp
+        self.md_bg_color = MDApp.get_running_app().theme_cls.bg_normal
         self.refresh_list()
 
     def _get_services(self):
@@ -112,6 +113,9 @@ class TagManagerScreen(MDScreen):
             self._add_batch_confirm_button()
 
     def _build_tag_row(self, name: str, is_pinned: bool) -> MDBoxLayout:
+        from kivymd.app import MDApp
+        theme = MDApp.get_running_app().theme_cls
+
         row = MDBoxLayout(
             orientation="horizontal",
             size_hint_y=None,
@@ -133,7 +137,7 @@ class TagManagerScreen(MDScreen):
         row.add_widget(label)
 
         pin_icon = "pin" if is_pinned else "pin-outline"
-        pin_color = (0.25, 0.32, 0.71, 1) if is_pinned else (0.5, 0.5, 0.5, 1)
+        pin_color = theme.primary_color if is_pinned else theme.secondary_text_color
         pin_btn = MDIconButton(
             icon=pin_icon,
             size_hint=(None, None),

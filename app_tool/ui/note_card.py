@@ -19,7 +19,6 @@ KV = """
     padding: dp(12)
     elevation: 2
     radius: dp(12)
-    md_bg_color: (1, 1, 1, 1)
 
     RelativeLayout:
         id: content_layout
@@ -121,8 +120,9 @@ class NoteCard(MDCard, TouchBehavior):
         self.register_event_type("on_complete_toggle")
         self.register_event_type("on_edit")
         self.register_event_type("on_delete")
+        self.register_event_type("on_drag_start")
         super().__init__(**kwargs)
-        self.duration_long_touch = 1.0
+        self.duration_long_touch = 0.5
         Clock.schedule_once(lambda dt: self._apply_visual_state(), 0)
         Clock.schedule_once(lambda dt: self.on_tag_names(None, self.tag_names), 0)
 
@@ -140,13 +140,15 @@ class NoteCard(MDCard, TouchBehavior):
             return
         chips_box = self.ids.chips_box
         chips_box.clear_widgets()
+        chip_bg = self.theme_cls.bg_light
+        chip_text = self.theme_cls.text_color
         for name in value:
             chip = MDChip(
                 size_hint=(None, None),
                 size=(dp(90), dp(32)),
-                md_bg_color=(0.9, 0.9, 0.9, 1),
+                md_bg_color=chip_bg,
             )
-            label = MDChipText(text=name, color=(0.3, 0.3, 0.3, 1))
+            label = MDChipText(text=name, color=chip_text)
             label.shorten = True
             label.shorten_from = 'right'
             label.text_size = (dp(82), None)
@@ -156,13 +158,13 @@ class NoteCard(MDCard, TouchBehavior):
     def _apply_visual_state(self):
         if self.is_completed:
             self.elevation = 0
-            self.md_bg_color = (0.95, 0.95, 0.95, 1)
+            self.md_bg_color = self.theme_cls.bg_dark
             self.ids.title_label.opacity = 0.6
             self.ids.content_preview.opacity = 0.5
             self.ids.complete_btn.icon = "undo"
         else:
             self.elevation = 2
-            self.md_bg_color = (1, 1, 1, 1)
+            self.md_bg_color = self.theme_cls.bg_normal
             self.ids.title_label.opacity = 1
             self.ids.content_preview.opacity = 0.8
             self.ids.complete_btn.icon = "check-circle"
@@ -181,8 +183,12 @@ class NoteCard(MDCard, TouchBehavior):
         return content
 
     def on_long_touch(self, touch, *args):
-        """长按触发置顶/取消置顶。"""
-        self.dispatch("on_pin_toggle")
+        """长按触发拖拽排序（仅限卡片主体区域，按钮上不触发）。"""
+        for btn_id in ("pin_btn", "complete_btn", "edit_btn", "delete_btn"):
+            btn = self.ids.get(btn_id)
+            if btn and btn.collide_point(*self.to_widget(touch.x, touch.y)):
+                return
+        self.dispatch("on_drag_start", touch)
 
     def on_pin_toggle(self, *args):
         pass
@@ -194,4 +200,7 @@ class NoteCard(MDCard, TouchBehavior):
         pass
 
     def on_delete(self, *args):
+        pass
+
+    def on_drag_start(self, *args):
         pass
