@@ -1,17 +1,11 @@
 """便签服务：CRUD + 置顶 + 拖拽排序 + 撤销 + 标签关联 + FTS5 同步。"""
 
 import json
-import random
-import string
 import sqlite3
 from datetime import datetime
 from app_tool.model.models import Note, Tag
 from app_tool.model.database import fts_insert, fts_update, fts_delete
 from app_tool.config import UNDO_TIMEOUT_SECONDS, MAX_TITLE_LENGTH, MAX_CONTENT_LENGTH, MAX_TAGS_PER_NOTE
-
-
-def _random_title() -> str:
-    return "便签-" + "".join(random.choices(string.ascii_lowercase + string.digits, k=6))
 
 
 class NoteWithTags:
@@ -120,6 +114,7 @@ class NoteService:
         # 暂存撤销数据（覆盖上次）
         tag_names = [t.name for t in self.get_tags(note_id)]
         self._undo_data = {
+            "title": note.title,
             "content": note.content,
             "tag_names": tag_names,
             "deleted_at": datetime.now(),
@@ -139,7 +134,7 @@ class NoteService:
         data = self._undo_data
         self._undo_data = None
         note = self.create(
-            title=_random_title(),
+            title=data["title"],
             content=data["content"],
         )
         for tag_name in data["tag_names"]:

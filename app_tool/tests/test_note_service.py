@@ -345,6 +345,7 @@ class TestUndoDelete:
 
         restored = svc.undo_delete()
         assert restored is not None
+        assert restored.title == "待撤销"
         assert restored.content == "撤销内容"
         tags = svc.get_tags(restored.id)
         assert len(tags) == 1
@@ -374,6 +375,7 @@ class TestUndoDelete:
         svc.delete(n2.id)
 
         restored = svc.undo_delete()
+        assert restored.title == "第二"
         assert restored.content == "第二内容"
 
     def test_undo_timeout_returns_none(self, db_conn, monkeypatch):
