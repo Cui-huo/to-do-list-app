@@ -29,36 +29,36 @@ KV = """
             MDTopAppBar:
                 id: top_bar
                 type: "top"
-                anchor_title: "left"
                 pos_hint: {"x": 0, "y": 0}
                 size_hint: 1, 1
 
-                MDBoxLayout:
-                    id: title_box
-                    orientation: "horizontal"
-                    spacing: 0
+            MDBoxLayout:
+                id: title_box
+                orientation: "horizontal"
+                spacing: 0
+                adaptive_width: True
+                adaptive_height: True
+                pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+                MDLabel:
+                    id: username_btn
+                    text: root.username or "某某"
+                    font_style: "Subtitle2"
+                    theme_text_color: "Custom"
+                    text_color: (1, 0.85, 0.4, 1)
                     adaptive_width: True
-                    pos_hint: {"center_y": 0.5}
+                    size_hint_y: None
+                    height: self.texture_size[1]
+                    on_touch_down: if self.collide_point(*args[1].pos) and not self.disabled: root.edit_username()
 
-                    MDLabel:
-                        id: username_btn
-                        text: root.username or "某某"
-                        font_style: "Subtitle2"
-                        theme_text_color: "Custom"
-                        text_color: (1, 0.85, 0.4, 1)
-                        adaptive_width: True
-                        size_hint_y: None
-                        height: self.texture_size[1]
-                        on_touch_down: if self.collide_point(*args[1].pos) and not self.disabled: root.edit_username()
-
-                    MDLabel:
-                        text: "的专属便签本"
-                        font_style: "Subtitle2"
-                        theme_text_color: "Custom"
-                        text_color: (1, 1, 1, 1)
-                        adaptive_width: True
-                        size_hint_y: None
-                        height: self.texture_size[1]
+                MDLabel:
+                    text: "的专属便签本"
+                    font_style: "Subtitle2"
+                    theme_text_color: "Custom"
+                    text_color: (1, 1, 1, 1)
+                    adaptive_width: True
+                    size_hint_y: None
+                    height: self.texture_size[1]
 
             MDIconButton:
                 id: undo_btn
@@ -84,22 +84,29 @@ KV = """
                 orientation: "vertical"
                 size_hint_x: 0.25
                 adaptive_height: True
-                spacing: dp(1)
+                spacing: dp(0)
                 padding: dp(2)
 
-                MDIconButton:
+                MDLabel:
                     id: func_sort_icon
-                    icon: "sort-clock-ascending"
+                    text: "\U000F1549"
+                    font_style: "Icon"
+                    font_size: "28sp"
                     size_hint: None, None
-                    size: dp(36), dp(36)
+                    size: dp(32), dp(32)
                     pos_hint: {"center_x": 0.5}
-                    on_release: root.toggle_sort_preference()
+                    halign: "center"
+                    valign: "center"
+                    text_size: self.size
+                    on_touch_down: if self.collide_point(*args[1].pos): root.toggle_sort_preference()
 
                 MDLabel:
                     id: sort_label
                     text: "按更新时间"
                     font_style: "Caption"
                     halign: "center"
+                    valign: "top"
+                    text_size: self.size
                     size_hint_y: None
                     height: dp(18)
 
@@ -107,20 +114,27 @@ KV = """
                 orientation: "vertical"
                 size_hint_x: 0.25
                 adaptive_height: True
-                spacing: dp(1)
+                spacing: dp(0)
                 padding: dp(2)
 
-                MDIconButton:
-                    icon: "magnify"
+                MDLabel:
+                    text: "\U000F0349"
+                    font_style: "Icon"
+                    font_size: "28sp"
                     size_hint: None, None
-                    size: dp(36), dp(36)
+                    size: dp(32), dp(32)
                     pos_hint: {"center_x": 0.5}
-                    on_release: root.open_search()
+                    halign: "center"
+                    valign: "center"
+                    text_size: self.size
+                    on_touch_down: if self.collide_point(*args[1].pos): root.open_search()
 
                 MDLabel:
                     text: "便签检索"
                     font_style: "Caption"
                     halign: "center"
+                    valign: "top"
+                    text_size: self.size
                     size_hint_y: None
                     height: dp(18)
 
@@ -128,20 +142,27 @@ KV = """
                 orientation: "vertical"
                 size_hint_x: 0.25
                 adaptive_height: True
-                spacing: dp(1)
+                spacing: dp(0)
                 padding: dp(2)
 
-                MDIconButton:
-                    icon: "tag-multiple"
+                MDLabel:
+                    text: "\U000F04FB"
+                    font_style: "Icon"
+                    font_size: "28sp"
                     size_hint: None, None
-                    size: dp(36), dp(36)
+                    size: dp(32), dp(32)
                     pos_hint: {"center_x": 0.5}
-                    on_release: root.open_tag_manager()
+                    halign: "center"
+                    valign: "center"
+                    text_size: self.size
+                    on_touch_down: if self.collide_point(*args[1].pos): root.open_tag_manager()
 
                 MDLabel:
                     text: "标签"
                     font_style: "Caption"
                     halign: "center"
+                    valign: "top"
+                    text_size: self.size
                     size_hint_y: None
                     height: dp(18)
 
@@ -149,20 +170,27 @@ KV = """
                 orientation: "vertical"
                 size_hint_x: 0.25
                 adaptive_height: True
-                spacing: dp(1)
+                spacing: dp(0)
                 padding: dp(2)
 
-                MDIconButton:
-                    icon: "cog"
+                MDLabel:
+                    text: "\U000F0493"
+                    font_style: "Icon"
+                    font_size: "28sp"
                     size_hint: None, None
-                    size: dp(36), dp(36)
+                    size: dp(32), dp(32)
                     pos_hint: {"center_x": 0.5}
-                    on_release: root.open_settings()
+                    halign: "center"
+                    valign: "center"
+                    text_size: self.size
+                    on_touch_down: if self.collide_point(*args[1].pos): root.open_settings()
 
                 MDLabel:
                     text: "设置"
                     font_style: "Caption"
                     halign: "center"
+                    valign: "top"
+                    text_size: self.size
                     size_hint_y: None
                     height: dp(18)
 
@@ -672,10 +700,10 @@ class MainScreen(MDScreen):
         current = note_svc._get_sort_preference()
         if current == "updated_at":
             self.ids.sort_label.text = "按更新时间"
-            self.ids.func_sort_icon.icon = "sort-clock-ascending"
+            self.ids.func_sort_icon.text = "\U000F1549"
         else:
             self.ids.sort_label.text = "按创建时间"
-            self.ids.func_sort_icon.icon = "sort-calendar-ascending"
+            self.ids.func_sort_icon.text = "\U000F1547"
 
     def toggle_sort_preference(self):
         note_svc, _, _ = self._get_services()

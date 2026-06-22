@@ -1,13 +1,19 @@
 """便签应用主入口：MDApp + DB 初始化 + 服务注入 + ScreenManager。"""
 
+import ctypes
 import os
 import sys
 import sqlite3
 
+from kivy.clock import Clock
 from kivy.core.text import LabelBase
 from kivy.core.window import Window
 from kivymd.app import MDApp
 from kivymd.uix.screenmanager import MDScreenManager
+
+# DWM 属性常量（Windows 标题栏暗色模式）
+DWMWA_USE_IMMERSIVE_DARK_MODE = 20   # Win10 2004+
+DWMWA_CAPTION_COLOR = 35             # 回退：Win10 旧版
 
 from app_tool.model.database import init_db
 from app_tool.controller.note_service import NoteService
@@ -87,7 +93,30 @@ class NotesApp(MDApp):
         sm.add_widget(TagManagerScreen(name="tags"))
         sm.add_widget(SettingsScreen(name="settings"))
 
+        # 标题栏主题延迟到下一帧（等待窗口 HWND 可用）
+        is_dark = (theme == "Dark")
+        Clock.schedule_once(lambda dt: self._apply_titlebar_theme(is_dark), 0)
+
         return sm
+
+    def _apply_titlebar_theme(self, dark: bool):
+        """通过 DWM API 设置 Windows 标题栏暗色/亮色。"""
+        try:
+            hwnd = Window.get_window_info().window
+        except AttributeError:
+            return  # 非 Windows 平台，静默跳过
+        if not hwnd:
+            return
+        value = ctypes.c_int(1 if dark else 0)
+        size = ctypes.sizeof(value)
+        try:
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE,
+                ctypes.byref(value), size,
+            )
+            ctypes.windll.dwmapi.DwmFlush()
+        except Exception:
+            pass
 
     def on_stop(self):
         if self.db_conn:

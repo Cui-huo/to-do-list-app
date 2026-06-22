@@ -150,6 +150,7 @@ class SettingsScreen(MDScreen):
         new_theme = "Dark" if active else "Light"
         app.theme_cls.theme_style = new_theme
         app.settings_service.set_dark_mode(new_theme)
+        app._apply_titlebar_theme(active)
         self._update_theme_colors()
         self._load_settings()
 
