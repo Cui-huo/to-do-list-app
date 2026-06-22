@@ -295,6 +295,10 @@ class MainScreen(MDScreen):
         self.md_bg_color = theme.bg_normal
         self.ids.func_row.md_bg_color = theme.bg_light
         self.ids.search_bar.md_bg_color = theme.bg_light
+        if theme.theme_style == "Dark":
+            self.ids.top_bar.md_bg_color = theme.bg_dark
+        else:
+            self.ids.top_bar.md_bg_color = theme.primary_color
 
     def _load_username(self):
         from kivymd.app import MDApp

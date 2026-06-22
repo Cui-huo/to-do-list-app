@@ -157,6 +157,10 @@ class SettingsScreen(MDScreen):
         from kivymd.app import MDApp
         theme = MDApp.get_running_app().theme_cls
         self.md_bg_color = theme.bg_normal
+        if theme.theme_style == "Dark":
+            self.ids.top_bar.md_bg_color = theme.bg_dark
+        else:
+            self.ids.top_bar.md_bg_color = theme.primary_color
 
     def set_sort_updated(self):
         note_svc, _ = self._get_services()
