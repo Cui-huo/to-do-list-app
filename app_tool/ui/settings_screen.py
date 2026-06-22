@@ -344,10 +344,10 @@ class SettingsScreen(MDScreen):
             app.db_conn.commit()
 
     def _build_color_buttons(self, selected_rgba, on_select, parent):
-        """构建颜色选择按钮行，返回按钮列表用于高亮切换。"""
+        """构建颜色选择按钮行，根据当前主题过滤选项。"""
         row = MDBoxLayout(orientation="horizontal", spacing=dp(8), adaptive_height=True)
         btns = []
-        for cname, crgba in COLOR_OPTIONS:
+        for cname, crgba in self._get_theme_color_options():
             btn = MDFlatButton(
                 text=cname,
                 size_hint=(None, None),
@@ -547,13 +547,13 @@ class SettingsScreen(MDScreen):
                 u_save["color"] = list(u_state["color"])
             self._save_style_dict("username_style", u_save)
             self._save_style_dict("title_suffix_style", {
-                "color": list(s_state["color"]) if s_state["color"] else [1, 1, 1, 1],
+                "color": list(s_state["color"]) if s_state["color"] else None,
                 "font_size": s_state["font_size"],
                 "font": s_state["font"],
                 "bold": s_state["bold"],
             })
-            # 同步回主界面
-            main_screen.username_color = u_state["color"]
+            # 同步回主界面（默认时用金色兜底，避免 ObjectProperty 拒绝 None）
+            main_screen.username_color = u_state["color"] if u_state["color"] else (1, 0.85, 0.4, 1)
             main_screen.username_font = u_state["font"]
             main_screen.username_bold = u_state["bold"]
             main_screen._apply_title_suffix_style()
@@ -700,11 +700,32 @@ class SettingsScreen(MDScreen):
         )
         dialog.open()
 
-    # ── 组4：便签卡片样式（可折叠 + ScrollView + 预览卡片） ──
+    # ── 组4：便签卡片样式（可折叠 + ScrollView + 预览卡片跟随主题） ──
+
+    def _get_theme_color_options(self):
+        """根据主题返回颜色选项，全部显式颜色。夜间含白色，日间含黑色。"""
+        from kivymd.app import MDApp
+        is_dark = MDApp.get_running_app().theme_cls.theme_style == "Dark"
+        if is_dark:
+            return [
+                ("白色", (1, 1, 1, 1)),
+                ("金色", (1, 0.85, 0.4, 1)),
+                ("天蓝", (0.39, 0.71, 0.96, 1)),
+                ("珊瑚橙", (0.91, 0.45, 0.29, 1)),
+            ]
+        else:
+            return [
+                ("黑色", (0.05, 0.05, 0.05, 1)),
+                ("金色", (1, 0.85, 0.4, 1)),
+                ("天蓝", (0.39, 0.71, 0.96, 1)),
+                ("珊瑚橙", (0.91, 0.45, 0.29, 1)),
+            ]
 
     def open_group4_dialog(self):
         from kivymd.uix.card import MDCard
         from kivymd.uix.scrollview import MDScrollView
+        from kivymd.app import MDApp
+        theme = MDApp.get_running_app().theme_cls
         main_screen = self.manager.get_screen("main")
         raw = self._load_style_dict("note_card_styles") or {}
         t_raw = raw.get("title", {})
@@ -712,7 +733,7 @@ class SettingsScreen(MDScreen):
         c_raw = raw.get("content", {})
 
         t_color = tuple(t_raw["color"]) if t_raw.get("color") else None
-        g_color = tuple(g_raw["color"]) if g_raw.get("color") else (0.91, 0.45, 0.29, 1)
+        g_color = tuple(g_raw["color"]) if g_raw.get("color") else None
         c_color = tuple(c_raw["color"]) if c_raw.get("color") else None
 
         t_state = {
@@ -739,17 +760,10 @@ class SettingsScreen(MDScreen):
 
         body = MDBoxLayout(orientation="vertical", spacing=dp(8), padding=dp(8), adaptive_height=True)
 
-        # ── 预览卡片（顶部留间距） ──
+        # ── 预览卡片（跟随主题背景） ──
         body.add_widget(Widget(size_hint_y=None, height=dp(8)))
         body.add_widget(MDLabel(text="预览", font_style="Caption", theme_text_color="Hint", adaptive_height=True))
-        preview_card = MDCard(
-            size_hint=(None, None),
-            size=(dp(320), dp(140)),
-            padding=dp(12),
-            elevation=2,
-            radius=dp(12),
-            md_bg_color=(0.98, 0.98, 0.98, 1),
-        )
+
         card_inner = MDBoxLayout(orientation="vertical", spacing=dp(6), adaptive_height=True)
         preview_title = MDLabel(
             text="示例便签标题",
@@ -767,7 +781,7 @@ class SettingsScreen(MDScreen):
             preview_title.theme_text_color = "Primary"
         card_inner.add_widget(preview_title)
 
-        # 标签行 — 直接存 label 引用，不用 walk()
+        # 标签行 — 直接存 label 引用
         chip_row = MDBoxLayout(orientation="horizontal", spacing=dp(4), adaptive_height=True)
         preview_chip_labels = []
         for tname in ["工作", "紧急"]:
@@ -783,8 +797,8 @@ class SettingsScreen(MDScreen):
                 font_size=g_state["font_size"],
                 font_name=g_state["font"] or "Roboto",
                 bold=g_state["bold"],
-                theme_text_color="Custom",
-                text_color=g_state["color"],
+                theme_text_color="Custom" if g_state["color"] else "Primary",
+                text_color=g_state["color"] if g_state["color"] else (0, 0, 0, 0),
                 halign="center",
                 valign="center",
                 adaptive_width=True,
@@ -816,7 +830,17 @@ class SettingsScreen(MDScreen):
             preview_content.theme_text_color = "Secondary"
         card_inner.add_widget(preview_content)
 
+        preview_card = MDCard(
+            size_hint=(None, None),
+            width=dp(320),
+            padding=dp(12),
+            elevation=2,
+            radius=dp(12),
+            md_bg_color=theme.bg_normal,
+        )
         preview_card.add_widget(card_inner)
+        # 卡片高度跟随内容
+        card_inner.bind(height=lambda _, h: setattr(preview_card, 'height', h + dp(24)))
         body.add_widget(preview_card)
 
         # ── 预览刷新 ──
@@ -834,7 +858,10 @@ class SettingsScreen(MDScreen):
                 lbl.font_name = g_state["font"] or "Roboto"
                 lbl.bold = g_state["bold"]
                 if g_state["color"]:
+                    lbl.theme_text_color = "Custom"
                     lbl.text_color = g_state["color"]
+                else:
+                    lbl.theme_text_color = "Primary"
             preview_content.font_size = c_state["font_size"]
             preview_content.font_name = c_state["font"] or "Roboto"
             preview_content.bold = c_state["bold"]
@@ -845,29 +872,31 @@ class SettingsScreen(MDScreen):
                 preview_content.theme_text_color = "Secondary"
 
         # ── 可折叠样式区 ──
-
         def _make_collapsible_section(label_text, style_state):
-            """创建可折叠区域：标题按钮 + 内容区。默认展开。"""
+            """创建可折叠区域。默认展开；折叠时保存高度以便恢复。"""
+            from kivy.clock import Clock
             container = MDBoxLayout(orientation="vertical", spacing=dp(2), adaptive_height=True)
-
-            # 折叠/展开按钮
             header_btn = MDFlatButton(
                 text=f"▼ {label_text}",
                 size_hint_y=None,
                 height=dp(36),
             )
-            # 内容区
             section_content = MDBoxLayout(orientation="vertical", spacing=dp(2), adaptive_height=True)
+            section_content._expanded_height = None
 
             def _toggle(*_):
                 if section_content.opacity:
+                    section_content._expanded_height = section_content.height or section_content.minimum_height
                     section_content.opacity = 0
                     section_content.height = 0
                     header_btn.text = f"▶ {label_text}"
                 else:
                     section_content.opacity = 1
-                    section_content.height = section_content.minimum_height
                     header_btn.text = f"▼ {label_text}"
+                    section_content.adaptive_height = False
+                    section_content.height = section_content._expanded_height or 200
+                    # 下一帧恢复 adaptive_height
+                    Clock.schedule_once(lambda dt, sc=section_content: setattr(sc, 'adaptive_height', True), 0)
 
             header_btn.bind(on_release=_toggle)
             container.add_widget(header_btn)
@@ -891,7 +920,7 @@ class SettingsScreen(MDScreen):
                     "bold": t_state["bold"],
                 },
                 "tag": {
-                    "color": list(g_state["color"]) if g_state["color"] else [0.91, 0.45, 0.29, 1],
+                    "color": list(g_state["color"]) if g_state["color"] else None,
                     "font_size": g_state["font_size"],
                     "font": g_state["font"],
                     "bold": g_state["bold"],

@@ -395,10 +395,7 @@ class MainScreen(MDScreen):
             self.title_suffix_color = tuple(color)
             label.theme_text_color = "Custom"
             label.text_color = tuple(color)
-        else:
-            self.title_suffix_color = (1, 1, 1, 1)
-            label.theme_text_color = "Custom"
-            label.text_color = (1, 1, 1, 1)
+        # color 为 None 时跳过颜色设置，保留 label 当前颜色（白色，top bar 默认）
         fs = style.get("font_size", "20sp")
         self.title_suffix_font_size = fs
         label.font_size = fs
@@ -424,7 +421,7 @@ class MainScreen(MDScreen):
                 label.text_color = tuple(color)
             else:
                 label.theme_text_color = "Primary"
-        self.func_row_color = tuple(color) if color else None
+        self.func_row_color = tuple(color) if color else (0, 0, 0, 0)
         fs = style.get("font_size", "12sp")
         self.func_row_font_size = fs
         fn = style.get("font", "")
@@ -446,7 +443,7 @@ class MainScreen(MDScreen):
                 label.text_color = tuple(color)
             else:
                 label.theme_text_color = "Primary"
-        self.section_header_color = tuple(color) if color else None
+        self.section_header_color = tuple(color) if color else (0, 0, 0, 0)
         fs = style.get("font_size", "20sp")
         self.section_header_font_size = fs
         fn = style.get("font", "")

@@ -587,3 +587,74 @@ class TestNoteCardDynamicStyles:
         card = NoteCard()
         # content_color 默认 None → theme_text_color = "Secondary"
         assert card.ids.content_preview.theme_text_color == "Secondary"
+
+
+# ════════════════════════════════════════════════════════════
+# 文字样式传递验证 — 各组 _apply_* 方法确认
+# ════════════════════════════════════════════════════════════
+
+class TestApplyTextStyles:
+    """保存样式 → _apply_* → 验证标签属性。"""
+
+    @pytest.fixture
+    def main_screen(self, kivy_app_instance):
+        from app_tool.ui.main_screen import MainScreen
+        return MainScreen()
+
+    def test_apply_title_suffix_font_size(self, main_screen, db_conn):
+        """保存 title_suffix_style 后 _apply 能改 label.font_size"""
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        old_conn = app.db_conn
+        app.db_conn = db_conn
+        db_conn.execute("CREATE TABLE IF NOT EXISTS UserSettings (key TEXT PRIMARY KEY, value TEXT)")
+        db_conn.commit()
+        try:
+            main_screen.save_style("title_suffix_style", {
+                "color": [1, 0, 0, 1], "font_size": "10sp", "font": "Lemibo", "bold": True
+            })
+            main_screen._apply_title_suffix_style()
+            label = main_screen.ids.title_suffix_label
+            assert label.font_size == pytest.approx(10, abs=2), f"期望 10sp，实际 {label.font_size}"
+            assert label.font_name == "Lemibo"
+            assert label.bold is True
+            assert label.text_color == [1, 0, 0, 1]
+        finally:
+            app.db_conn = old_conn
+
+    def test_apply_func_row_font_size(self, main_screen, db_conn):
+        """保存 func_row_style 后 _apply 能改 label.font_size"""
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        old_conn = app.db_conn
+        app.db_conn = db_conn
+        db_conn.execute("CREATE TABLE IF NOT EXISTS UserSettings (key TEXT PRIMARY KEY, value TEXT)")
+        db_conn.commit()
+        try:
+            main_screen.save_style("func_row_style", {
+                "color": None, "font_size": "20sp", "font": "AlimamaDongFangDaKai", "bold": True
+            })
+            main_screen._apply_func_row_style()
+            label = main_screen.ids.sort_label
+            assert label.font_size == pytest.approx(20, abs=2), f"期望 20sp，实际 {label.font_size}"
+            assert label.bold is True
+        finally:
+            app.db_conn = old_conn
+
+    def test_apply_section_header_font_size(self, main_screen, db_conn):
+        """保存 section_header_style 后 _apply 能改 label.font_size"""
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        old_conn = app.db_conn
+        app.db_conn = db_conn
+        db_conn.execute("CREATE TABLE IF NOT EXISTS UserSettings (key TEXT PRIMARY KEY, value TEXT)")
+        db_conn.commit()
+        try:
+            main_screen.save_style("section_header_style", {
+                "color": None, "font_size": "10sp", "font": "", "bold": False
+            })
+            main_screen._apply_section_header_style()
+            label = main_screen.ids.incomplete_header
+            assert label.font_size == pytest.approx(10, abs=2), f"期望 10sp，实际 {label.font_size}"
+        finally:
+            app.db_conn = old_conn
