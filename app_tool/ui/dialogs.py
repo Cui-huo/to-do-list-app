@@ -105,7 +105,7 @@ class AddEditContent(MDBoxLayout):
             size=(dp(90), dp(32)),
             md_bg_color=bg,
         )
-        chip.add_widget(MDChipText(text=name, color=tc))
+        chip.add_widget(MDChipText(text=name, color=tc, theme_text_color="Custom"))
         chip.bind(on_press=lambda c, n=name: self._toggle_tag(n))
         return chip
 

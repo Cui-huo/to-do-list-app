@@ -224,3 +224,105 @@ MDLabel:
 ### 模型名称
 
 DeepSeek V4 Pro
+
+---
+
+## 4. 标签颜色和大小不生效 — KivyMD 1.2.0 MDChipText 主题覆盖 + 多文件全局修复
+
+### 问题描述与背景
+
+- **日期**：2026-06-22
+- **背景**：需求为便签卡片标签使用暖色（珊瑚橙）+ Caption 字号，同时卡片标题/内容换用自定义东方大楷字体，标题栏用户名可点击切换样式。实现后发现标签字体大小和颜色均不生效，仍为默认黑色默认字号。
+
+### 解决过程
+
+**【用户要求】**
+便签卡片的标签移到标题下方、内容上方。标题栏字体放大2号。卡片标题用行楷粗体，标签暖色醒目且比标题小，内容用楷体。用户名可点击切换字体颜色粗细。
+
+**【前置任务（一次通过）】**
+- 标签位置：`note_card.py` KV 中 `chips_box` 与 `content_preview` 互换 → title → tags → content
+- 标题栏字体：`main_screen.py` 两处 `font_style: "Subtitle2"` → `"H6"`
+- 字体注册：`app.py` 注册 `AlimamaDongFangDaKai`、`Lemibo`（保持原名，不重命名）
+- 卡片标题：`font_name: "AlimamaDongFangDaKai"` + `bold: True`
+- 卡片内容：`font_name: "AlimamaDongFangDaKai"`（不加粗区分层级）
+
+**【用户要求】**
+用户名可点击弹出样式选择面板（颜色+字体+粗细）。
+
+**【尝试1 — 用户名样式面板】**
+- 方案：点击用户名 → `MDDialog`，内含昵称输入 + 3个颜色圆点按钮（金/天蓝/珊瑚橙）+ 3个字体按钮（默认/东方大楷/乐米波波）+ `MDSwitch` 粗体开关 + 预览行
+- 持久化 JSON → `UserSettings` key=`username_style`
+
+**【用户反馈】**
+崩溃：`ModuleNotFoundError: No module named 'kivymd.uix.switch'`
+
+**【尝试2 — 修复 MDSwitch 导入路径】**
+- 定位：KivyMD 1.2.0 中 `MDSwitch` 在 `kivymd.uix.selectioncontrol`，不在 `kivymd.uix.switch`
+- 修复：`from kivymd.uix.selectioncontrol import MDSwitch`
+
+**【崩溃 — font_name 空字符串】**
+- 崩溃：`OSError: Label: File '.ttf' not found`
+- 根因：预览标签 `font_name=_selected_font`，默认值为空字符串 `""`，Kivy 将其拼接为 `".ttf"` 查找字体文件
+- 修复：`font_name=_selected_font or "Roboto"` 两处（预览创建 + `_update_preview`）
+
+**【用户反馈】**
+标签字体明显对了（Caption 生效），但颜色仍然是黑色。
+
+**【尝试3 — MDChipText 设 theme_text_color="Custom"】**
+- 定位：KivyMD 的 `MDChipText` 继承 `MDLabel`，未设 `theme_text_color="Custom"` 时 KivyMD 主题自动覆盖 `color` 属性
+- 修复：`MDChipText(text=name, color=chip_text, theme_text_color="Custom", font_style="Caption")`
+
+**【用户反馈】**
+仍然黑色。
+
+**【尝试4 — MDChip.text_color 属性】**
+- 方案：在 `MDChip()` 上设 `text_color=chip_text`
+- 结果：启动日志显示 `Deprecated property "text_color"` 警告，颜色仍不生效
+
+**【用户反馈】**
+仍然黑色。
+
+**【尝试5 — Clock.schedule_once 延迟设色】**
+- 关键发现：KivyMD 1.2.0 的 `MDChip.add_widget(MDChipText)` 会在内部将 `MDChipText` 转换为普通 `MDLabel`（放入 `LabelTextContainer`），转换过程中颜色属性丢失
+- 方案：
+
+```python
+# 创建芯片时不设颜色，仅设 font_style
+label = MDChipText(text=name, theme_text_color="Custom", font_style="Caption")
+chip.add_widget(label)
+
+# 延迟一帧，KivyMD 完成内部转换后遍历树找到 Label 设颜色
+Clock.schedule_once(lambda dt, c=chip: _set_chip_text_color(c, chip_text))
+```
+
+`_set_chip_text_color` 函数用 `chip.walk()` 遍历所有子孙，找到第一个 `Label` 实例设 `color`。
+
+**【用户反馈】**
+"很好，这次颜色对了！"
+
+**【R30 全局排查】**
+发现 `search_dialog.py`（3处）和 `dialogs.py`（1处）同样创建 `MDChipText` 时未设 `theme_text_color="Custom"`，其中选中态使用白色 `(1,1,1,1)` 等自定义颜色会被主题覆盖。一次性全部修复。
+
+### 最终方案
+
+| 文件 | 修改 |
+|---|---|
+| `app_tool/ui/app.py` | 注册 `AlimamaDongFangDaKai` + `Lemibo` 自定义字体 |
+| `app_tool/ui/note_card.py` KV | title→tags→content 布局重组；标题加 `font_name`+`bold`；内容加 `font_name` |
+| `app_tool/ui/note_card.py` `on_tag_names` | `MDChipText` 设 `theme_text_color="Custom"`+`font_style="Caption"`；`Clock.schedule_once` 延迟遍历树设最终颜色 |
+| `app_tool/ui/note_card.py` 新增 | `_set_chip_text_color(chip, rgba)` — 全局函数遍历芯片树找 Label 设色 |
+| `app_tool/ui/main_screen.py` | 新增 `username_font/color/bold` 属性 + `_load/_save_username_style` 持久化；`edit_username` 重写为统一样式面板 |
+| `app_tool/ui/main_screen.py` KV | `username_btn` 绑定动态 `font_name/text_color/bold`；标题 `Subtitle2→H6` |
+| `app_tool/ui/search_dialog.py` | 3处 `MDChipText` 加 `theme_text_color="Custom"` |
+| `app_tool/ui/dialogs.py` | 1处 `MDChipText` 加 `theme_text_color="Custom"` |
+| `app_tool/tests/test_ui.py` | 新增 9 个测试覆盖字体/颜色/持久化 |
+
+**核心教训**：
+- KivyMD 1.2.0 `MDChip` 的 `text_color` 属性已废弃不生效，`MDChipText` 的 `color` 会被主题覆盖
+- 正确姿势：`theme_text_color="Custom"` + `Clock.schedule_once` 延迟设色（绕过内部转换）
+- KivyMD 1.2.0 `MDSwitch` 在 `kivymd.uix.selectioncontrol`，非 `kivymd.uix.switch`
+- `font_name=""` 空字符串会使 Kivy 查找 `".ttf"` 崩溃，需用 `"Roboto"` 兜底
+
+### 模型名称
+
+DeepSeek V4 Pro

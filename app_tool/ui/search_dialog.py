@@ -235,6 +235,7 @@ class SearchContent(MDBoxLayout):
         created_chip.add_widget(MDChipText(
             text="创建时间",
             color=active_tc if self.time_type == "创建时间" else inactive_tc,
+            theme_text_color="Custom",
         ))
         created_chip.bind(on_press=lambda *_: self._set_time_type("创建时间"))
 
@@ -246,6 +247,7 @@ class SearchContent(MDBoxLayout):
         completed_chip.add_widget(MDChipText(
             text="完成时间",
             color=active_tc if self.time_type == "完成时间" else inactive_tc,
+            theme_text_color="Custom",
         ))
         completed_chip.bind(on_press=lambda *_: self._set_time_type("完成时间"))
 
@@ -280,7 +282,7 @@ class SearchContent(MDBoxLayout):
             size=(dp(90), dp(32)),
             md_bg_color=bg,
         )
-        chip.add_widget(MDChipText(text=name, color=tc))
+        chip.add_widget(MDChipText(text=name, color=tc, theme_text_color="Custom"))
         chip.bind(on_press=lambda c, n=name: self._toggle_tag(n))
         return chip
 

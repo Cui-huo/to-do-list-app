@@ -2,7 +2,7 @@
 
 from kivy.lang import Builder
 from kivy.metrics import dp
-from kivy.properties import ObjectProperty, StringProperty
+from kivy.properties import ObjectProperty, StringProperty, BooleanProperty
 from kivy.uix.widget import Widget
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.button import MDIconButton, MDFloatingActionButton, MDFlatButton
@@ -43,9 +43,11 @@ KV = """
                 MDLabel:
                     id: username_btn
                     text: root.username or "某某"
-                    font_style: "Subtitle2"
+                    font_style: "H6"
+                    font_name: root.username_font if root.username_font else "Roboto"
+                    bold: root.username_bold
                     theme_text_color: "Custom"
-                    text_color: (1, 0.85, 0.4, 1)
+                    text_color: root.username_color
                     adaptive_width: True
                     size_hint_y: None
                     height: self.texture_size[1]
@@ -53,7 +55,7 @@ KV = """
 
                 MDLabel:
                     text: "的专属便签本"
-                    font_style: "Subtitle2"
+                    font_style: "H6"
                     theme_text_color: "Custom"
                     text_color: (1, 1, 1, 1)
                     adaptive_width: True
@@ -302,6 +304,9 @@ class MainScreen(MDScreen):
     search_label = ObjectProperty(None)
     completed_label = ObjectProperty(None)
     username = StringProperty("")
+    username_font = StringProperty("")
+    username_color = ObjectProperty((1, 0.85, 0.4, 1))
+    username_bold = BooleanProperty(False)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -311,6 +316,7 @@ class MainScreen(MDScreen):
         self._ghost_card = None
         self._drag_touch_uid: int | None = None
         self._load_username()
+        self._load_username_style()
 
     def on_enter(self, *args):
         self._update_theme_colors()
@@ -349,15 +355,70 @@ class MainScreen(MDScreen):
             app.db_conn.commit()
             self.username = name
 
+    def _load_username_style(self):
+        import json
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        if app and app.db_conn:
+            row = app.db_conn.execute(
+                "SELECT value FROM UserSettings WHERE key='username_style'"
+            ).fetchone()
+            if row:
+                try:
+                    style = json.loads(row["value"])
+                    if "color" in style:
+                        self.username_color = tuple(style["color"])
+                    if "font" in style:
+                        self.username_font = style["font"]
+                    if "bold" in style:
+                        self.username_bold = style["bold"]
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    pass
+
+    def _save_username_style(self):
+        import json
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        if app and app.db_conn:
+            app.db_conn.execute(
+                "INSERT OR REPLACE INTO UserSettings (key, value) VALUES ('username_style', ?)",
+                (json.dumps({
+                    "color": list(self.username_color),
+                    "font": self.username_font,
+                    "bold": self.username_bold,
+                }),),
+            )
+            app.db_conn.commit()
+
     def edit_username(self):
         from kivymd.uix.dialog import MDDialog
+        from kivymd.uix.selectioncontrol import MDSwitch
+        from kivymd.uix.chip import MDChip, MDChipText
+
+        COLOR_OPTIONS = [
+            ("金色", (1, 0.85, 0.4, 1)),
+            ("天蓝", (0.39, 0.71, 0.96, 1)),
+            ("珊瑚橙", (0.91, 0.45, 0.29, 1)),
+        ]
+        FONT_OPTIONS = [
+            ("默认", ""),
+            ("东方大楷", "AlimamaDongFangDaKai"),
+            ("乐米波波", "Lemibo"),
+        ]
+
+        # 暂存选择（取消时不保存）
+        _selected_color = list(self.username_color)
+        _selected_font = self.username_font
+        _selected_bold = self.username_bold
 
         content = MDBoxLayout(
             orientation="vertical",
-            spacing=dp(16),
+            spacing=dp(12),
             padding=dp(16),
             adaptive_height=True,
         )
+
+        # 昵称输入
         name_field = MDTextField(
             text=self.username or "",
             hint_text="请输入你的名字",
@@ -366,6 +427,129 @@ class MainScreen(MDScreen):
             height=dp(48),
         )
         content.add_widget(name_field)
+
+        # 颜色选择
+        color_label = MDLabel(
+            text="颜色",
+            font_style="Caption",
+            theme_text_color="Secondary",
+            adaptive_height=True,
+        )
+        content.add_widget(color_label)
+        color_row = MDBoxLayout(
+            orientation="horizontal",
+            spacing=dp(12),
+            adaptive_height=True,
+        )
+        _color_btns = []
+        for cname, crgba in COLOR_OPTIONS:
+            btn = MDFlatButton(
+                text=cname,
+                md_bg_color=crgba,
+                theme_text_color="Custom",
+                text_color=(0, 0, 0, 1) if sum(crgba[:3]) > 1.8 else (1, 1, 1, 1),
+                size_hint=(None, None),
+                size=(dp(72), dp(36)),
+            )
+            btn._crgba = crgba
+            btn.bind(on_release=lambda b, clr=crgba: _on_color_select(clr))
+            _color_btns.append(btn)
+            color_row.add_widget(btn)
+        content.add_widget(color_row)
+
+        def _on_color_select(clr):
+            nonlocal _selected_color
+            _selected_color = list(clr)
+            _update_preview()
+            for b in _color_btns:
+                b.line_color = (0, 0, 0, 0) if list(b._crgba) == _selected_color else (0, 0, 0, 0)
+
+        # 字体选择
+        font_label = MDLabel(
+            text="字体",
+            font_style="Caption",
+            theme_text_color="Secondary",
+            adaptive_height=True,
+        )
+        content.add_widget(font_label)
+        font_row = MDBoxLayout(
+            orientation="horizontal",
+            spacing=dp(8),
+            adaptive_height=True,
+        )
+        _font_btns = []
+        for fname, fval in FONT_OPTIONS:
+            btn = MDFlatButton(
+                text=fname,
+                size_hint=(None, None),
+                size=(dp(80), dp(36)),
+            )
+            btn._fval = fval
+            btn.bind(on_release=lambda b, fv=fval: _on_font_select(fv))
+            _font_btns.append(btn)
+            font_row.add_widget(btn)
+        content.add_widget(font_row)
+
+        def _on_font_select(fv):
+            nonlocal _selected_font
+            _selected_font = fv
+            _update_preview()
+
+        # 粗体开关
+        bold_row = MDBoxLayout(
+            orientation="horizontal",
+            spacing=dp(8),
+            adaptive_height=True,
+        )
+        bold_row.add_widget(MDLabel(
+            text="粗体",
+            font_style="Caption",
+            theme_text_color="Secondary",
+            adaptive_height=True,
+            adaptive_width=True,
+        ))
+        bold_switch = MDSwitch(active=_selected_bold)
+        bold_switch.bind(active=lambda _, v: _on_bold_toggle(v))
+        bold_row.add_widget(bold_switch)
+        content.add_widget(bold_row)
+
+        def _on_bold_toggle(v):
+            nonlocal _selected_bold
+            _selected_bold = v
+            _update_preview()
+
+        # 预览
+        preview_label = MDLabel(
+            text=self.username or "某某",
+            font_style="H6",
+            theme_text_color="Custom",
+            text_color=_selected_color,
+            font_name=_selected_font or "Roboto",
+            bold=_selected_bold,
+            adaptive_height=True,
+        )
+        content.add_widget(MDLabel(
+            text="预览",
+            font_style="Caption",
+            theme_text_color="Secondary",
+            adaptive_height=True,
+        ))
+        content.add_widget(preview_label)
+
+        def _update_preview():
+            preview_label.text_color = _selected_color
+            preview_label.font_name = _selected_font or "Roboto"
+            preview_label.bold = _selected_bold
+
+        def _on_save(*_):
+            name = name_field.text.strip()
+            if name:
+                self._save_username(name)
+            self.username_color = tuple(_selected_color)
+            self.username_font = _selected_font
+            self.username_bold = _selected_bold
+            self._save_username_style()
+            dialog.dismiss()
 
         dialog = MDDialog(
             title="编辑昵称",
@@ -378,17 +562,11 @@ class MainScreen(MDScreen):
                 ),
                 MDFlatButton(
                     text="保存",
-                    on_release=lambda *_: self._on_username_save(name_field, dialog),
+                    on_release=_on_save,
                 ),
             ],
         )
         dialog.open()
-
-    def _on_username_save(self, name_field, dialog):
-        name = name_field.text.strip()
-        dialog.dismiss()
-        if name:
-            self._save_username(name)
 
     def _get_services(self):
         from kivymd.app import MDApp

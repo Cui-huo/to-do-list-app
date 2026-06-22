@@ -43,6 +43,7 @@ KV = """
                     id: title_label
                     text: root.note_title
                     font_style: "Subtitle1"
+                    font_name: "AlimamaDongFangDaKai"
                     bold: True
                     size_hint_x: 0.9
                     size_hint_y: None
@@ -57,17 +58,6 @@ KV = """
                     size: dp(40), dp(40)
                     on_release: root.dispatch("on_pin_toggle")
 
-            MDLabel:
-                id: content_preview
-                text: root._make_preview()
-                font_style: "Body2"
-                size_hint_y: None
-                height: self.texture_size[1]
-                max_lines: 2
-                shorten: True
-                shorten_from: "right"
-                theme_text_color: "Secondary"
-
             MDBoxLayout:
                 id: chips_box
                 orientation: "horizontal"
@@ -75,6 +65,18 @@ KV = """
                 size_hint_y: None
                 height: dp(36) if root.tag_names else 0
                 adaptive_width: True
+
+            MDLabel:
+                id: content_preview
+                text: root._make_preview()
+                font_style: "Body2"
+                font_name: "AlimamaDongFangDaKai"
+                size_hint_y: None
+                height: self.texture_size[1]
+                max_lines: 2
+                shorten: True
+                shorten_from: "right"
+                theme_text_color: "Secondary"
 
             MDBoxLayout:
                 orientation: "horizontal"
@@ -105,6 +107,15 @@ KV = """
 """
 
 Builder.load_string(KV)
+
+
+def _set_chip_text_color(chip, rgba):
+    """KivyMD 1.2.0 内部转换后，遍历芯片树找到 Label 设颜色。"""
+    from kivy.uix.label import Label
+    for w in chip.walk():
+        if isinstance(w, Label):
+            w.color = rgba
+            return
 
 
 class NoteCard(MDCard, TouchBehavior):
@@ -141,18 +152,25 @@ class NoteCard(MDCard, TouchBehavior):
         chips_box = self.ids.chips_box
         chips_box.clear_widgets()
         chip_bg = self.theme_cls.bg_light
-        chip_text = self.theme_cls.text_color
+        chip_text = (0.91, 0.45, 0.29, 1)  # 珊瑚橙暖色
         for name in value:
             chip = MDChip(
                 size_hint=(None, None),
                 size=(dp(90), dp(32)),
                 md_bg_color=chip_bg,
             )
-            label = MDChipText(text=name, color=chip_text)
+            label = MDChipText(
+                text=name,
+                theme_text_color="Custom",
+                font_style="Caption",
+            )
             label.shorten = True
             label.shorten_from = 'right'
             label.text_size = (dp(82), None)
             chip.add_widget(label)
+            # KivyMD 1.2.0 内部会将 MDChipText 转为 MDLabel 并重置颜色，
+            # 延迟一帧后遍历芯片子树找到最终 Label 设置暖色
+            Clock.schedule_once(lambda dt, c=chip: _set_chip_text_color(c, chip_text))
             chips_box.add_widget(chip)
 
     def _apply_visual_state(self):

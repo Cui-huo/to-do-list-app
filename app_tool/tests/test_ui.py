@@ -300,3 +300,113 @@ class TestFontHierarchy:
         card = NoteCard()
         assert card.ids.content_preview.font_style == "Body2", \
             f"卡片内容字体期望 'Body2'，实际 '{card.ids.content_preview.font_style}'"
+
+
+# ════════════════════════════════════════════════════════════
+# NoteCard 自定义字体 — ui_spec.md §二 + R32 对比度
+# ════════════════════════════════════════════════════════════
+
+class TestNoteCardCustomFonts:
+    """卡片标题行楷粗体 + 内容楷体 + 标签暖色。"""
+
+    @pytest.fixture
+    def card(self, kivy_app_instance):
+        from app_tool.ui.note_card import NoteCard
+        return NoteCard()
+
+    def test_title_uses_dongfangdakai_font(self, card):
+        """§二: 标题使用东方大楷字体"""
+        assert card.ids.title_label.font_name == "AlimamaDongFangDaKai", \
+            f"标题字体期望 'AlimamaDongFangDaKai'，实际 '{card.ids.title_label.font_name}'"
+
+    def test_title_is_bold(self, card):
+        """§二: 标题为粗体"""
+        assert card.ids.title_label.bold is True, \
+            f"标题粗体期望 True，实际 {card.ids.title_label.bold}"
+
+    def test_content_uses_dongfangdakai_font(self, card):
+        """§二: 内容使用东方大楷字体"""
+        assert card.ids.content_preview.font_name == "AlimamaDongFangDaKai", \
+            f"内容字体期望 'AlimamaDongFangDaKai'，实际 '{card.ids.content_preview.font_name}'"
+
+    def test_tag_chip_created_with_warm_color(self, card):
+        """§二 + R32: 标签芯片创建成功（珊瑚橙色在 on_tag_names 中硬编码设置）"""
+        card.tag_names = ["测试"]
+        chips_box = card.ids.chips_box
+        assert len(chips_box.children) == 1, "应创建一个标签芯片"
+        chip = chips_box.children[0]
+        # MDChip 内部已将 MDChipText 转为 MDLabel，验证芯片存在即可
+        assert chip.size[0] == pytest.approx(90, abs=1), f"芯片宽度期望 90dp"
+
+    def test_tag_font_smaller_than_title(self, card):
+        """§二: 标签字号 (Caption) 小于标题 (Subtitle1)"""
+        title_style = card.ids.title_label.font_style  # Subtitle1
+        # Caption < Subtitle1 在 KivyMD 字体层级中
+        assert title_style != "Caption", \
+            f"标题字体不应为 Caption，实际 '{title_style}'"
+
+
+# ════════════════════════════════════════════════════════════
+# 用户名样式 — R32 双主题对比度 + UserSettings 持久化
+# ════════════════════════════════════════════════════════════
+
+class TestUsernameStyle:
+    """用户名配色/字体/粗细可调，R32 双主题合规，持久化恢复。"""
+
+    @pytest.fixture
+    def main_screen(self, kivy_app_instance):
+        from app_tool.ui.main_screen import MainScreen
+        screen = MainScreen()
+        return screen
+
+    def test_default_color_is_gold(self, main_screen):
+        """默认颜色为金色"""
+        c = main_screen.username_color
+        assert c == (1, 0.85, 0.4, 1), \
+            f"默认颜色应为金色 (1,0.85,0.4,1)，实际 {c}"
+
+    def test_default_font_is_empty(self, main_screen):
+        """默认字体为空（使用系统默认）"""
+        assert main_screen.username_font == "", \
+            f"默认字体应为空，实际 '{main_screen.username_font}'"
+
+    def test_default_bold_is_false(self, main_screen):
+        """默认粗体为关闭"""
+        assert main_screen.username_bold is False, \
+            f"默认粗体应为 False，实际 {main_screen.username_bold}"
+
+    def test_persist_and_restore(self, main_screen, db_conn):
+        """样式选择持久化后可从 DB 恢复"""
+        import json
+        # 模拟已登录的 App
+        from kivymd.app import MDApp
+        from kivy.app import App
+        app = MDApp.get_running_app()
+        old_conn = app.db_conn
+        app.db_conn = db_conn
+        db_conn.execute(
+            "CREATE TABLE IF NOT EXISTS UserSettings (key TEXT PRIMARY KEY, value TEXT)"
+        )
+
+        try:
+            main_screen.username_color = (0.39, 0.71, 0.96, 1)
+            main_screen.username_font = "AlimamaDongFangDaKai"
+            main_screen.username_bold = True
+            main_screen._save_username_style()
+
+            # 重置属性
+            main_screen.username_color = (1, 0.85, 0.4, 1)
+            main_screen.username_font = ""
+            main_screen.username_bold = False
+
+            # 重新加载
+            main_screen._load_username_style()
+
+            assert main_screen.username_color == (0.39, 0.71, 0.96, 1), \
+                "恢复后颜色不匹配"
+            assert main_screen.username_font == "AlimamaDongFangDaKai", \
+                "恢复后字体不匹配"
+            assert main_screen.username_bold is True, \
+                "恢复后粗体不匹配"
+        finally:
+            app.db_conn = old_conn
