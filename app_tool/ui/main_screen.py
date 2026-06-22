@@ -54,10 +54,8 @@ KV = """
                     on_touch_down: if self.collide_point(*args[1].pos) and not self.disabled: root.edit_username()
 
                 MDLabel:
+                    id: title_suffix_label
                     text: "的专属便签本"
-                    font_style: "H6"
-                    theme_text_color: "Custom"
-                    text_color: (1, 1, 1, 1)
                     adaptive_width: True
                     size_hint_y: None
                     height: self.texture_size[1]
@@ -105,7 +103,7 @@ KV = """
                 MDLabel:
                     id: sort_label
                     text: "按更新时间"
-                    font_style: "Caption"
+                    font_size: "12sp"
                     halign: "center"
                     valign: "top"
                     text_size: self.size
@@ -132,8 +130,9 @@ KV = """
                     on_touch_down: if self.collide_point(*args[1].pos): root.open_search()
 
                 MDLabel:
+                    id: func_search_label
                     text: "便签检索"
-                    font_style: "Caption"
+                    font_size: "12sp"
                     halign: "center"
                     valign: "top"
                     text_size: self.size
@@ -160,8 +159,9 @@ KV = """
                     on_touch_down: if self.collide_point(*args[1].pos): root.open_tag_manager()
 
                 MDLabel:
+                    id: func_tag_label
                     text: "标签"
-                    font_style: "Caption"
+                    font_size: "12sp"
                     halign: "center"
                     valign: "top"
                     text_size: self.size
@@ -188,8 +188,9 @@ KV = """
                     on_touch_down: if self.collide_point(*args[1].pos): root.open_settings()
 
                 MDLabel:
+                    id: func_settings_label
                     text: "设置"
-                    font_style: "Caption"
+                    font_size: "12sp"
                     halign: "center"
                     valign: "top"
                     text_size: self.size
@@ -308,6 +309,20 @@ class MainScreen(MDScreen):
     username_color = ObjectProperty((1, 0.85, 0.4, 1))
     username_bold = BooleanProperty(False)
 
+    # 文字样式属性（设置页可调）
+    title_suffix_color = ObjectProperty(None)
+    title_suffix_font_size = StringProperty("20sp")
+    title_suffix_font = StringProperty("")
+    title_suffix_bold = BooleanProperty(False)
+    func_row_color = ObjectProperty(None)
+    func_row_font_size = StringProperty("12sp")
+    func_row_font = StringProperty("")
+    func_row_bold = BooleanProperty(False)
+    section_header_color = ObjectProperty(None)
+    section_header_font_size = StringProperty("20sp")
+    section_header_font = StringProperty("")
+    section_header_bold = BooleanProperty(False)
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._completed_expanded = False
@@ -320,6 +335,8 @@ class MainScreen(MDScreen):
 
     def on_enter(self, *args):
         self._update_theme_colors()
+        self._load_username_style()
+        self._apply_text_styles()
         self.refresh_list()
         self._update_sort_label()
 
@@ -333,6 +350,113 @@ class MainScreen(MDScreen):
             self.ids.top_bar.md_bg_color = theme.bg_dark
         else:
             self.ids.top_bar.md_bg_color = theme.primary_color
+
+    # ── 文字样式加载与应用 ──
+
+    def _load_style(self, key):
+        """从 UserSettings 加载文字样式字典，无记录返回 None。"""
+        import json
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        if app and app.db_conn:
+            row = app.db_conn.execute(
+                "SELECT value FROM UserSettings WHERE key=?", (key,)
+            ).fetchone()
+            if row:
+                try:
+                    return json.loads(row["value"])
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    pass
+        return None
+
+    def save_style(self, key, style: dict):
+        """保存文字样式到 UserSettings（供设置页调用）。"""
+        import json
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        if app and app.db_conn:
+            app.db_conn.execute(
+                "INSERT OR REPLACE INTO UserSettings (key, value) VALUES (?, ?)",
+                (key, json.dumps(style)),
+            )
+            app.db_conn.commit()
+
+    def _apply_text_styles(self):
+        """从 DB 加载并应用所有文字样式。"""
+        self._apply_title_suffix_style()
+        self._apply_func_row_style()
+        self._apply_section_header_style()
+
+    def _apply_title_suffix_style(self):
+        style = self._load_style("title_suffix_style") or {}
+        label = self.ids.title_suffix_label
+        color = style.get("color")
+        if color:
+            self.title_suffix_color = tuple(color)
+            label.theme_text_color = "Custom"
+            label.text_color = tuple(color)
+        else:
+            self.title_suffix_color = (1, 1, 1, 1)
+            label.theme_text_color = "Custom"
+            label.text_color = (1, 1, 1, 1)
+        fs = style.get("font_size", "20sp")
+        self.title_suffix_font_size = fs
+        label.font_size = fs
+        fn = style.get("font", "")
+        self.title_suffix_font = fn
+        label.font_name = fn or "Roboto"
+        b = style.get("bold", False)
+        self.title_suffix_bold = b
+        label.bold = b
+
+    def _apply_func_row_style(self):
+        style = self._load_style("func_row_style") or {}
+        labels = [
+            self.ids.sort_label,
+            self.ids.func_search_label,
+            self.ids.func_tag_label,
+            self.ids.func_settings_label,
+        ]
+        color = style.get("color")
+        for label in labels:
+            if color:
+                label.theme_text_color = "Custom"
+                label.text_color = tuple(color)
+            else:
+                label.theme_text_color = "Primary"
+        self.func_row_color = tuple(color) if color else None
+        fs = style.get("font_size", "12sp")
+        self.func_row_font_size = fs
+        fn = style.get("font", "")
+        self.func_row_font = fn
+        b = style.get("bold", False)
+        self.func_row_bold = b
+        for label in labels:
+            label.font_size = fs
+            label.font_name = fn or "Roboto"
+            label.bold = b
+
+    def _apply_section_header_style(self):
+        style = self._load_style("section_header_style") or {}
+        labels = [self.ids.incomplete_header, self.ids.completed_label]
+        color = style.get("color")
+        for label in labels:
+            if color:
+                label.theme_text_color = "Custom"
+                label.text_color = tuple(color)
+            else:
+                label.theme_text_color = "Primary"
+        self.section_header_color = tuple(color) if color else None
+        fs = style.get("font_size", "20sp")
+        self.section_header_font_size = fs
+        fn = style.get("font", "")
+        self.section_header_font = fn
+        b = style.get("bold", False)
+        self.section_header_bold = b
+        for label in labels:
+            label.font_size = fs
+            label.font_name = fn or "Roboto"
+            label.bold = b
 
     def _load_username(self):
         from kivymd.app import MDApp
@@ -508,8 +632,11 @@ class MainScreen(MDScreen):
             adaptive_height=True,
             adaptive_width=True,
         ))
-        bold_switch = MDSwitch(active=_selected_bold)
+        bold_switch = MDSwitch()
         bold_switch.bind(active=lambda _, v: _on_bold_toggle(v))
+        # 延迟设置 active，避免 KivyMD 1.2.0 在 ids 就绪前触发动画崩溃
+        from kivy.clock import Clock
+        Clock.schedule_once(lambda dt: setattr(bold_switch, 'active', _selected_bold), 0)
         bold_row.add_widget(bold_switch)
         content.add_widget(bold_row)
 
@@ -617,6 +744,12 @@ class MainScreen(MDScreen):
         tags = note_svc.get_tags(note.id)
         tag_names = [t.name for t in tags]
 
+        # 从 DB 加载便签卡片样式（标题/标签/内容各自独立）
+        card_styles = self._load_style("note_card_styles") or {}
+        t = card_styles.get("title", {})
+        g = card_styles.get("tag", {})
+        c = card_styles.get("content", {})
+
         card = NoteCard(
             note_id=note.id,
             note_title=note.title or "（无标题）",
@@ -624,6 +757,18 @@ class MainScreen(MDScreen):
             tag_names=tag_names,
             is_completed=bool(note.is_completed),
             is_pinned=bool(note.is_pinned),
+            title_color=tuple(t["color"]) if t.get("color") else None,
+            title_font_size=t.get("font_size", "16sp"),
+            title_font=t.get("font", "AlimamaDongFangDaKai"),
+            title_bold=t.get("bold", True),
+            tag_color=tuple(g["color"]) if g.get("color") else (0.91, 0.45, 0.29, 1),
+            tag_font_size=g.get("font_size", "12sp"),
+            tag_font=g.get("font", ""),
+            tag_bold=g.get("bold", False),
+            content_color=tuple(c["color"]) if c.get("color") else None,
+            content_font_size=c.get("font_size", "12sp"),
+            content_font=c.get("font", "AlimamaDongFangDaKai"),
+            content_bold=c.get("bold", False),
         )
         card.bind(
             on_pin_toggle=lambda c: self._handle_pin_toggle(c),

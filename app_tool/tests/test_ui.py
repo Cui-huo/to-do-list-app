@@ -134,11 +134,12 @@ class TestFuncRowSizes:
             f"设置图标宽度期望 36dp，实际 {btn.size[0]}"
 
     def test_func_row_label_font_caption(self, screen):
-        """func_row 标签字体应为 Caption，不得为 Overline"""
+        """func_row 标签字体大小应为 12sp（原 Caption 等价）"""
         sort_box = screen.ids.func_row.children[2]
         label = sort_box.children[0]
-        assert label.font_style == "Caption", \
-            f"func_row 标签字体期望 'Caption'，实际 '{label.font_style}'"
+        # Kivy 将 "12sp" 转为数值，1x 密度下 ≈ 12.0
+        assert label.font_size == pytest.approx(12, abs=2), \
+            f"func_row 标签字体大小期望 12sp，实际 {label.font_size}"
 
 
 # ════════════════════════════════════════════════════════════
@@ -285,21 +286,23 @@ class TestFABPositioning:
 # ════════════════════════════════════════════════════════════
 
 class TestFontHierarchy:
-    """字体层级：标题 Subtitle1，内容 Body2，标签 Caption。"""
+    """字体层级：标题 16sp，内容 12sp，标签 12sp（动态 font_size 替代 font_style）。"""
 
     def test_note_card_title_font(self, kivy_app_instance):
-        """卡片标题字体应为 Subtitle1"""
+        """卡片标题字体大小应为 16sp"""
         from app_tool.ui.note_card import NoteCard
         card = NoteCard()
-        assert card.ids.title_label.font_style == "Subtitle1", \
-            f"卡片标题字体期望 'Subtitle1'，实际 '{card.ids.title_label.font_style}'"
+        fs = card.ids.title_label.font_size
+        assert fs == pytest.approx(16, abs=2), \
+            f"卡片标题字体大小期望 16sp，实际 {fs}"
 
     def test_note_card_content_font(self, kivy_app_instance):
-        """卡片内容预览字体应为 Body2"""
+        """卡片内容预览字体大小应为 12sp"""
         from app_tool.ui.note_card import NoteCard
         card = NoteCard()
-        assert card.ids.content_preview.font_style == "Body2", \
-            f"卡片内容字体期望 'Body2'，实际 '{card.ids.content_preview.font_style}'"
+        fs = card.ids.content_preview.font_size
+        assert fs == pytest.approx(12, abs=2), \
+            f"卡片内容字体大小期望 12sp，实际 {fs}"
 
 
 # ════════════════════════════════════════════════════════════
@@ -410,3 +413,177 @@ class TestUsernameStyle:
                 "恢复后粗体不匹配"
         finally:
             app.db_conn = old_conn
+
+
+# ════════════════════════════════════════════════════════════
+# 文字样式分组调整 — spec §设置页
+# ════════════════════════════════════════════════════════════
+
+class TestTextStyleProperties:
+    """MainScreen 文字样式属性默认值。"""
+
+    @pytest.fixture
+    def main_screen(self, kivy_app_instance):
+        from app_tool.ui.main_screen import MainScreen
+        return MainScreen()
+
+    def test_title_suffix_defaults(self, main_screen):
+        """标题后缀样式默认值：白色 20sp 无粗体"""
+        assert main_screen.title_suffix_color == (1, 1, 1, 1) or main_screen.title_suffix_color is None
+        assert main_screen.title_suffix_font_size == "20sp"
+        assert main_screen.title_suffix_font == ""
+        assert main_screen.title_suffix_bold is False
+
+    def test_func_row_defaults(self, main_screen):
+        """功能栏样式默认值：12sp 无粗体"""
+        assert main_screen.func_row_font_size == "12sp"
+        assert main_screen.func_row_font == ""
+        assert main_screen.func_row_bold is False
+
+    def test_section_header_defaults(self, main_screen):
+        """分类标题样式默认值：20sp 无粗体"""
+        assert main_screen.section_header_font_size == "20sp"
+        assert main_screen.section_header_font == ""
+        assert main_screen.section_header_bold is False
+
+
+class TestTextStylePersistence:
+    """文字样式持久化读写。"""
+
+    def test_save_and_load_title_suffix(self, kivy_app_instance, db_conn):
+        import json
+        from app_tool.ui.main_screen import MainScreen
+        from kivymd.app import MDApp
+        screen = MainScreen()
+        app = MDApp.get_running_app()
+        old_conn = app.db_conn
+        app.db_conn = db_conn
+        db_conn.execute(
+            "CREATE TABLE IF NOT EXISTS UserSettings (key TEXT PRIMARY KEY, value TEXT)"
+        )
+        db_conn.commit()
+        try:
+            style = {"color": [1, 0.5, 0, 1], "font_size": "24sp", "font": "Lemibo", "bold": True}
+            screen.save_style("title_suffix_style", style)
+            loaded = screen._load_style("title_suffix_style")
+            assert loaded == style, f"存取不匹配: {loaded}"
+        finally:
+            app.db_conn = old_conn
+
+    def test_save_and_load_func_row(self, kivy_app_instance, db_conn):
+        from app_tool.ui.main_screen import MainScreen
+        from kivymd.app import MDApp
+        screen = MainScreen()
+        app = MDApp.get_running_app()
+        old_conn = app.db_conn
+        app.db_conn = db_conn
+        db_conn.execute(
+            "CREATE TABLE IF NOT EXISTS UserSettings (key TEXT PRIMARY KEY, value TEXT)"
+        )
+        db_conn.commit()
+        try:
+            style = {"color": None, "font_size": "10sp", "font": "", "bold": False}
+            screen.save_style("func_row_style", style)
+            loaded = screen._load_style("func_row_style")
+            assert loaded == style
+        finally:
+            app.db_conn = old_conn
+
+    def test_save_and_load_section_header(self, kivy_app_instance, db_conn):
+        from app_tool.ui.main_screen import MainScreen
+        from kivymd.app import MDApp
+        screen = MainScreen()
+        app = MDApp.get_running_app()
+        old_conn = app.db_conn
+        app.db_conn = db_conn
+        db_conn.execute(
+            "CREATE TABLE IF NOT EXISTS UserSettings (key TEXT PRIMARY KEY, value TEXT)"
+        )
+        db_conn.commit()
+        try:
+            style = {"color": [0.2, 0.2, 0.2, 1], "font_size": "16sp", "font": "AlimamaDongFangDaKai", "bold": True}
+            screen.save_style("section_header_style", style)
+            loaded = screen._load_style("section_header_style")
+            assert loaded == style
+        finally:
+            app.db_conn = old_conn
+
+    def test_save_and_load_note_card_styles(self, kivy_app_instance, db_conn):
+        from app_tool.ui.main_screen import MainScreen
+        from kivymd.app import MDApp
+        screen = MainScreen()
+        app = MDApp.get_running_app()
+        old_conn = app.db_conn
+        app.db_conn = db_conn
+        db_conn.execute(
+            "CREATE TABLE IF NOT EXISTS UserSettings (key TEXT PRIMARY KEY, value TEXT)"
+        )
+        db_conn.commit()
+        try:
+            style = {
+                "title": {"color": [1, 0, 0, 1], "font_size": "20sp", "font": "Lemibo", "bold": False},
+                "tag": {"color": [0, 0.5, 1, 1], "font_size": "10sp", "font": "", "bold": True},
+                "content": {"color": None, "font_size": "14sp", "font": "AlimamaDongFangDaKai", "bold": False},
+            }
+            screen.save_style("note_card_styles", style)
+            loaded = screen._load_style("note_card_styles")
+            assert loaded == style
+        finally:
+            app.db_conn = old_conn
+
+
+class TestNoteCardDynamicStyles:
+    """NoteCard 动态样式属性传递。"""
+
+    def test_default_styles_applied(self, kivy_app_instance):
+        """默认样式正确设置"""
+        from app_tool.ui.note_card import NoteCard
+        card = NoteCard()
+        assert card.title_font == "AlimamaDongFangDaKai"
+        assert card.title_bold is True
+        assert card.title_font_size == "16sp"
+        assert card.tag_color == (0.91, 0.45, 0.29, 1)
+        assert card.tag_font_size == "12sp"
+        assert card.content_font == "AlimamaDongFangDaKai"
+        assert card.content_font_size == "12sp"
+
+    def test_custom_styles_via_kwargs(self, kivy_app_instance):
+        """通过构造函数传入自定义样式"""
+        from app_tool.ui.note_card import NoteCard
+        card = NoteCard(
+            title_color=(1, 0, 0, 1),
+            title_font_size="20sp",
+            title_font="Lemibo",
+            title_bold=False,
+            tag_color=(0, 0.5, 1, 1),
+            tag_font_size="10sp",
+            tag_font="AlimamaDongFangDaKai",
+            tag_bold=True,
+            content_color=(0.2, 0.2, 0.2, 1),
+            content_font_size="14sp",
+            content_font="",
+            content_bold=False,
+        )
+        assert card.title_color == (1, 0, 0, 1)
+        assert card.title_font_size == "20sp"
+        assert card.title_font == "Lemibo"
+        assert card.title_bold is False
+        assert card.tag_color == (0, 0.5, 1, 1)
+        assert card.content_font_size == "14sp"
+
+    def test_title_label_uses_dynamic_color(self, kivy_app_instance):
+        """标题 label 的 text_color 跟随 title_color 属性"""
+        from app_tool.ui.note_card import NoteCard
+        card = NoteCard(title_color=(1, 0.5, 0, 1))
+        # KV 绑定: "Custom" if root.title_color else "Primary"
+        # title_color 非 None → theme_text_color = "Custom"
+        assert card.ids.title_label.theme_text_color == "Custom"
+        # Kivy 将 tuple 颜色转为 list 存储
+        assert list(card.ids.title_label.text_color) == [1, 0.5, 0, 1]
+
+    def test_content_label_default_secondary(self, kivy_app_instance):
+        """内容 label 默认使用 Secondary 主题色"""
+        from app_tool.ui.note_card import NoteCard
+        card = NoteCard()
+        # content_color 默认 None → theme_text_color = "Secondary"
+        assert card.ids.content_preview.theme_text_color == "Secondary"

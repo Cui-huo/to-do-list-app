@@ -42,9 +42,11 @@ KV = """
                 MDLabel:
                     id: title_label
                     text: root.note_title
-                    font_style: "Subtitle1"
-                    font_name: "AlimamaDongFangDaKai"
-                    bold: True
+                    font_size: root.title_font_size
+                    font_name: root.title_font or "Roboto"
+                    bold: root.title_bold
+                    theme_text_color: "Custom" if root.title_color else "Primary"
+                    text_color: root.title_color or (0, 0, 0, 0)
                     size_hint_x: 0.9
                     size_hint_y: None
                     height: self.texture_size[1] if self.text else dp(4)
@@ -69,14 +71,16 @@ KV = """
             MDLabel:
                 id: content_preview
                 text: root._make_preview()
-                font_style: "Body2"
-                font_name: "AlimamaDongFangDaKai"
+                font_size: root.content_font_size
+                font_name: root.content_font or "Roboto"
+                bold: root.content_bold
+                theme_text_color: "Custom" if root.content_color else "Secondary"
+                text_color: root.content_color or (0, 0, 0, 0)
                 size_hint_y: None
                 height: self.texture_size[1]
                 max_lines: 2
                 shorten: True
                 shorten_from: "right"
-                theme_text_color: "Secondary"
 
             MDBoxLayout:
                 orientation: "horizontal"
@@ -109,12 +113,15 @@ KV = """
 Builder.load_string(KV)
 
 
-def _set_chip_text_color(chip, rgba):
-    """KivyMD 1.2.0 内部转换后，遍历芯片树找到 Label 设颜色。"""
+def _apply_chip_text_style(chip, rgba, font_size, font_name, bold):
+    """KivyMD 1.2.0 内部转换 MDChipText→MDLabel 后，重新应用全部样式。"""
     from kivy.uix.label import Label
     for w in chip.walk():
         if isinstance(w, Label):
             w.color = rgba
+            w.font_size = font_size
+            w.font_name = font_name or "Roboto"
+            w.bold = bold
             return
 
 
@@ -125,6 +132,20 @@ class NoteCard(MDCard, TouchBehavior):
     tag_names = ObjectProperty([])
     is_completed = BooleanProperty(False)
     is_pinned = BooleanProperty(False)
+
+    # 动态样式属性（设置页可调）
+    title_color = ObjectProperty(None)
+    title_font_size = StringProperty("16sp")
+    title_font = StringProperty("AlimamaDongFangDaKai")
+    title_bold = BooleanProperty(True)
+    tag_color = ObjectProperty((0.91, 0.45, 0.29, 1))
+    tag_font_size = StringProperty("12sp")
+    tag_font = StringProperty("")
+    tag_bold = BooleanProperty(False)
+    content_color = ObjectProperty(None)
+    content_font_size = StringProperty("12sp")
+    content_font = StringProperty("AlimamaDongFangDaKai")
+    content_bold = BooleanProperty(False)
 
     def __init__(self, **kwargs):
         self.register_event_type("on_pin_toggle")
@@ -152,7 +173,7 @@ class NoteCard(MDCard, TouchBehavior):
         chips_box = self.ids.chips_box
         chips_box.clear_widgets()
         chip_bg = self.theme_cls.bg_light
-        chip_text = (0.91, 0.45, 0.29, 1)  # 珊瑚橙暖色
+        chip_text = self.tag_color  # 动态样式
         for name in value:
             chip = MDChip(
                 size_hint=(None, None),
@@ -162,15 +183,20 @@ class NoteCard(MDCard, TouchBehavior):
             label = MDChipText(
                 text=name,
                 theme_text_color="Custom",
-                font_style="Caption",
+                font_size=self.tag_font_size,
+                font_name=self.tag_font or "Roboto",
+                bold=self.tag_bold,
             )
             label.shorten = True
             label.shorten_from = 'right'
             label.text_size = (dp(82), None)
             chip.add_widget(label)
-            # KivyMD 1.2.0 内部会将 MDChipText 转为 MDLabel 并重置颜色，
-            # 延迟一帧后遍历芯片子树找到最终 Label 设置暖色
-            Clock.schedule_once(lambda dt, c=chip: _set_chip_text_color(c, chip_text))
+            # KivyMD 1.2.0 内部会将 MDChipText 转为 MDLabel 并重置所有样式，
+            # 延迟一帧后重新应用颜色+字体+大小+粗体
+            Clock.schedule_once(
+                lambda dt, c=chip, clr=chip_text, fs=self.tag_font_size, fn=self.tag_font, b=self.tag_bold:
+                _apply_chip_text_style(c, clr, fs, fn, b)
+            )
             chips_box.add_widget(chip)
 
     def _apply_visual_state(self):
