@@ -368,10 +368,10 @@ class TestUsernameStyle:
         assert c == (1, 0.85, 0.4, 1), \
             f"默认颜色应为金色 (1,0.85,0.4,1)，实际 {c}"
 
-    def test_default_font_is_empty(self, main_screen):
-        """默认字体为空（使用系统默认）"""
-        assert main_screen.username_font == "", \
-            f"默认字体应为空，实际 '{main_screen.username_font}'"
+    def test_default_font_is_dongfangdakai(self, main_screen):
+        """默认字体为东方大楷"""
+        assert main_screen.username_font == "AlimamaDongFangDaKai", \
+            f"默认字体应为 'AlimamaDongFangDaKai'，实际 '{main_screen.username_font}'"
 
     def test_default_bold_is_false(self, main_screen):
         """默认粗体为关闭"""
@@ -658,3 +658,154 @@ class TestApplyTextStyles:
             assert label.font_size == pytest.approx(10, abs=2), f"期望 10sp，实际 {label.font_size}"
         finally:
             app.db_conn = old_conn
+
+
+# ════════════════════════════════════════════════════════════
+# 双主题文字样式 — spec.md §设置
+# ════════════════════════════════════════════════════════════
+
+class TestDualThemeTextStyles:
+    """白天/黑夜模式各自独立的文字样式 key。"""
+
+    @pytest.fixture
+    def main_screen(self, kivy_app_instance):
+        from app_tool.ui.main_screen import MainScreen
+        return MainScreen()
+
+    def test_light_and_dark_keys_independent(self, main_screen, db_conn):
+        """R33: 白天和黑夜 key 独立读写，互不影响。"""
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        old_conn = app.db_conn
+        app.db_conn = db_conn
+        db_conn.execute("CREATE TABLE IF NOT EXISTS UserSettings (key TEXT PRIMARY KEY, value TEXT)")
+        db_conn.commit()
+        try:
+            # 写入白天样式
+            light_style = {"color": [0, 0, 0, 1], "font_size": "14sp", "font": "Lemibo", "bold": False}
+            main_screen.save_style("func_row_style", light_style)
+            # 写入黑夜样式
+            dark_style = {"color": [1, 1, 1, 1], "font_size": "20sp", "font": "AlimamaDongFangDaKai", "bold": True}
+            main_screen.save_style("dark_func_row_style", dark_style)
+            # 验证互相独立
+            assert main_screen._load_style("func_row_style") == light_style
+            assert main_screen._load_style("dark_func_row_style") == dark_style
+            # 互不干扰
+            assert main_screen._load_style("func_row_style") != dark_style
+            assert main_screen._load_style("dark_func_row_style") != light_style
+        finally:
+            app.db_conn = old_conn
+
+    def test_dark_mode_uses_dark_prefix(self, main_screen, db_conn):
+        """深色模式下 _get_theme_prefix 返回 'dark_'。"""
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        old_theme = app.theme_cls.theme_style
+        try:
+            app.theme_cls.theme_style = "Dark"
+            assert main_screen._get_theme_prefix() == "dark_"
+            app.theme_cls.theme_style = "Light"
+            assert main_screen._get_theme_prefix() == ""
+        finally:
+            app.theme_cls.theme_style = old_theme
+
+    def test_apply_func_row_loads_dark_key_in_dark_mode(self, main_screen, db_conn):
+        """深色模式下 _apply_func_row_style 读取 dark_func_row_style。"""
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        old_conn = app.db_conn
+        old_theme = app.theme_cls.theme_style
+        app.db_conn = db_conn
+        db_conn.execute("CREATE TABLE IF NOT EXISTS UserSettings (key TEXT PRIMARY KEY, value TEXT)")
+        db_conn.commit()
+        try:
+            # 写入黑夜样式
+            dark_style = {"color": [0.39, 0.71, 0.96, 1], "font_size": "10sp", "font": "Lemibo", "bold": True}
+            main_screen.save_style("dark_func_row_style", dark_style)
+            # 切换到深色模式
+            app.theme_cls.theme_style = "Dark"
+            main_screen._apply_func_row_style()
+            label = main_screen.ids.sort_label
+            assert label.font_size == pytest.approx(10, abs=2)
+            assert label.font_name == "Lemibo"
+            assert label.bold is True
+        finally:
+            app.db_conn = old_conn
+            app.theme_cls.theme_style = old_theme
+
+    def test_note_card_styles_theme_aware(self, main_screen, db_conn):
+        """_build_note_card 在深色模式下使用 dark_note_card_styles。"""
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        old_conn = app.db_conn
+        old_theme = app.theme_cls.theme_style
+        app.db_conn = db_conn
+        db_conn.execute("CREATE TABLE IF NOT EXISTS UserSettings (key TEXT PRIMARY KEY, value TEXT)")
+        db_conn.commit()
+        try:
+            # 写入白天卡片样式
+            light_card = {
+                "title": {"color": [0, 0, 0, 1], "font_size": "14sp", "font": "Lemibo", "bold": False},
+                "tag": {"color": None, "font_size": "10sp", "font": "", "bold": True},
+                "content": {"color": None, "font_size": "12sp", "font": "AlimamaDongFangDaKai", "bold": False},
+            }
+            main_screen.save_style("note_card_styles", light_card)
+            # 写入黑夜卡片样式（不同值）
+            dark_card = {
+                "title": {"color": [1, 1, 1, 1], "font_size": "20sp", "font": "AlimamaDongFangDaKai", "bold": True},
+                "tag": {"color": [0.91, 0.45, 0.29, 1], "font_size": "10sp", "font": "Lemibo", "bold": False},
+                "content": {"color": [1, 1, 1, 1], "font_size": "14sp", "font": "Lemibo", "bold": False},
+            }
+            main_screen.save_style("dark_note_card_styles", dark_card)
+            # 深色模式下应该加载 dark_note_card_styles
+            app.theme_cls.theme_style = "Dark"
+            loaded_dark = main_screen._load_style(f"{main_screen._get_theme_prefix()}note_card_styles")
+            assert loaded_dark == dark_card
+            # 浅色模式下应该加载 note_card_styles
+            app.theme_cls.theme_style = "Light"
+            loaded_light = main_screen._load_style(f"{main_screen._get_theme_prefix()}note_card_styles")
+            assert loaded_light == light_card
+        finally:
+            app.db_conn = old_conn
+            app.theme_cls.theme_style = old_theme
+
+    def test_defaults_light_keys_saved_to_db(self, main_screen, db_conn):
+        """首次使用时，白天默认样式可以被正确使用（即使 DB 无记录）。"""
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        old_conn = app.db_conn
+        old_theme = app.theme_cls.theme_style
+        app.db_conn = db_conn
+        db_conn.execute("CREATE TABLE IF NOT EXISTS UserSettings (key TEXT PRIMARY KEY, value TEXT)")
+        db_conn.commit()
+        try:
+            app.theme_cls.theme_style = "Light"
+            # 不写入任何样式，直接 apply
+            main_screen._apply_func_row_style()
+            # 验证有默认行为（不崩溃，用了 {} 兜底）
+            label = main_screen.ids.sort_label
+            assert label.font_size is not None
+        finally:
+            app.db_conn = old_conn
+            app.theme_cls.theme_style = old_theme
+
+    def test_dark_defaults_safe_on_empty_db(self, main_screen, db_conn):
+        """深色模式下 DB 无记录时，_apply 方法不崩溃且有兜底值。"""
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        old_conn = app.db_conn
+        old_theme = app.theme_cls.theme_style
+        app.db_conn = db_conn
+        db_conn.execute("CREATE TABLE IF NOT EXISTS UserSettings (key TEXT PRIMARY KEY, value TEXT)")
+        db_conn.commit()
+        try:
+            app.theme_cls.theme_style = "Dark"
+            # 深色模式下无 dark_* key 也不崩溃
+            main_screen._apply_title_suffix_style()
+            main_screen._apply_func_row_style()
+            main_screen._apply_section_header_style()
+            label = main_screen.ids.title_suffix_label
+            assert label.font_size is not None
+        finally:
+            app.db_conn = old_conn
+            app.theme_cls.theme_style = old_theme

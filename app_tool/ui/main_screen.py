@@ -16,6 +16,32 @@ from app_tool.ui.note_card import NoteCard
 from app_tool.ui.dialogs import build_add_edit_dialog, build_confirm_dialog
 from app_tool.ui.search_dialog import build_search_dialog
 
+# ── 双主题文字样式默认值（key 为基础名，不含 dark_ 前缀） ──
+
+LIGHT_STYLE_DEFAULTS = {
+    "username_style":       {"color": [1, 0.85, 0.4, 1],       "font_size": "20sp", "font": "AlimamaDongFangDaKai", "bold": False},
+    "title_suffix_style":   {"color": [0.39, 0.71, 0.96, 1],   "font_size": "20sp", "font": "Lemibo",                "bold": False},
+    "func_row_style":       {"color": [0.05, 0.05, 0.05, 1],   "font_size": "12sp", "font": "Lemibo",                "bold": False},
+    "section_header_style": {"color": [0.39, 0.71, 0.96, 1],   "font_size": "20sp", "font": "AlimamaDongFangDaKai", "bold": False},
+    "note_card_styles": {
+        "title":   {"color": [0.05, 0.05, 0.05, 1], "font_size": "16sp", "font": "AlimamaDongFangDaKai", "bold": True},
+        "tag":     {"color": [0.91, 0.45, 0.29, 1], "font_size": "12sp", "font": "Lemibo",                "bold": False},
+        "content": {"color": [0.05, 0.05, 0.05, 1], "font_size": "12sp", "font": "Lemibo",                "bold": False},
+    },
+}
+
+DARK_STYLE_DEFAULTS = {
+    "username_style":       {"color": [1, 0.85, 0.4, 1],       "font_size": "20sp", "font": "AlimamaDongFangDaKai", "bold": False},
+    "title_suffix_style":   {"color": [0.39, 0.71, 0.96, 1],   "font_size": "20sp", "font": "Lemibo",                "bold": False},
+    "func_row_style":       {"color": [0.39, 0.71, 0.96, 1],   "font_size": "12sp", "font": "Lemibo",                "bold": False},
+    "section_header_style": {"color": [1, 0.85, 0.4, 1],       "font_size": "20sp", "font": "AlimamaDongFangDaKai", "bold": False},
+    "note_card_styles": {
+        "title":   {"color": [1, 1, 1, 1],          "font_size": "16sp", "font": "AlimamaDongFangDaKai", "bold": True},
+        "tag":     {"color": [0.91, 0.45, 0.29, 1], "font_size": "12sp", "font": "Lemibo",                "bold": False},
+        "content": {"color": [1, 1, 1, 1],          "font_size": "12sp", "font": "Lemibo",                "bold": False},
+    },
+}
+
 KV = """
 <MainScreen>:
 
@@ -353,6 +379,17 @@ class MainScreen(MDScreen):
 
     # ── 文字样式加载与应用 ──
 
+    def _get_theme_prefix(self):
+        """根据当前主题返回 UserSettings key 前缀。深色模式返回 'dark_'。"""
+        from kivymd.app import MDApp
+        return "dark_" if MDApp.get_running_app().theme_cls.theme_style == "Dark" else ""
+
+    def _get_style_default(self, base_key: str):
+        """返回当前主题对应的默认样式字典，DB 无记录时兜底。"""
+        prefix = self._get_theme_prefix()
+        defaults = DARK_STYLE_DEFAULTS if prefix == "dark_" else LIGHT_STYLE_DEFAULTS
+        return defaults.get(base_key, {})
+
     def _load_style(self, key):
         """从 UserSettings 加载文字样式字典，无记录返回 None。"""
         import json
@@ -388,7 +425,8 @@ class MainScreen(MDScreen):
         self._apply_section_header_style()
 
     def _apply_title_suffix_style(self):
-        style = self._load_style("title_suffix_style") or {}
+        prefix = self._get_theme_prefix()
+        style = self._load_style(f"{prefix}title_suffix_style") or self._get_style_default("title_suffix_style")
         label = self.ids.title_suffix_label
         color = style.get("color")
         if color:
@@ -407,7 +445,8 @@ class MainScreen(MDScreen):
         label.bold = b
 
     def _apply_func_row_style(self):
-        style = self._load_style("func_row_style") or {}
+        prefix = self._get_theme_prefix()
+        style = self._load_style(f"{prefix}func_row_style") or self._get_style_default("func_row_style")
         labels = [
             self.ids.sort_label,
             self.ids.func_search_label,
@@ -434,7 +473,8 @@ class MainScreen(MDScreen):
             label.bold = b
 
     def _apply_section_header_style(self):
-        style = self._load_style("section_header_style") or {}
+        prefix = self._get_theme_prefix()
+        style = self._load_style(f"{prefix}section_header_style") or self._get_style_default("section_header_style")
         labels = [self.ids.incomplete_header, self.ids.completed_label]
         color = style.get("color")
         for label in labels:
@@ -480,9 +520,10 @@ class MainScreen(MDScreen):
         import json
         from kivymd.app import MDApp
         app = MDApp.get_running_app()
+        prefix = self._get_theme_prefix()
         if app and app.db_conn:
             row = app.db_conn.execute(
-                "SELECT value FROM UserSettings WHERE key='username_style'"
+                "SELECT value FROM UserSettings WHERE key=?", (f"{prefix}username_style",)
             ).fetchone()
             if row:
                 try:
@@ -493,21 +534,30 @@ class MainScreen(MDScreen):
                         self.username_font = style["font"]
                     if "bold" in style:
                         self.username_bold = style["bold"]
+                    return
                 except (json.JSONDecodeError, TypeError, ValueError):
                     pass
+        # DB 无记录时使用预设默认值
+        default = self._get_style_default("username_style")
+        if "color" in default:
+            self.username_color = tuple(default["color"])
+        if "font" in default:
+            self.username_font = default["font"]
+        self.username_bold = default.get("bold", False)
 
     def _save_username_style(self):
         import json
         from kivymd.app import MDApp
         app = MDApp.get_running_app()
+        prefix = self._get_theme_prefix()
         if app and app.db_conn:
             app.db_conn.execute(
-                "INSERT OR REPLACE INTO UserSettings (key, value) VALUES ('username_style', ?)",
-                (json.dumps({
+                "INSERT OR REPLACE INTO UserSettings (key, value) VALUES (?, ?)",
+                (f"{prefix}username_style", json.dumps({
                     "color": list(self.username_color),
                     "font": self.username_font,
                     "bold": self.username_bold,
-                }),),
+                })),
             )
             app.db_conn.commit()
 
@@ -742,7 +792,8 @@ class MainScreen(MDScreen):
         tag_names = [t.name for t in tags]
 
         # 从 DB 加载便签卡片样式（标题/标签/内容各自独立）
-        card_styles = self._load_style("note_card_styles") or {}
+        prefix = self._get_theme_prefix()
+        card_styles = self._load_style(f"{prefix}note_card_styles") or self._get_style_default("note_card_styles")
         t = card_styles.get("title", {})
         g = card_styles.get("tag", {})
         c = card_styles.get("content", {})

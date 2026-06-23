@@ -326,3 +326,186 @@ Clock.schedule_once(lambda dt, c=chip: _set_chip_text_color(c, chip_text))
 ### 模型名称
 
 DeepSeek V4 Pro
+
+---
+
+## 5. 文字样式分组调整 — 6 项连锁 Bug 修复
+
+### 问题描述与背景
+
+- **日期**：2026-06-22
+- **背景**：在设置页面新增 4 组文字样式调整功能，分别控制标题栏、功能栏、分类标题、便签卡片的颜色/字号/粗体/字体。初始实现后发现多个连锁问题。
+
+---
+
+### 5.1 MDSwitch(active=…) 初始化竞态闪退
+
+**【用户要求】**
+设置页各组弹窗正常打开，不闪退。
+
+**【尝试1 — 直接使用 MDSwitch(active=True)】**
+- 方案：`MDSwitch(active=style_state["bold"])` 通过构造参数设置初始状态
+- 结果：打开弹窗闪退，报错 `AttributeError: 'super' object has no attribute '__getattr__'`
+
+**【根因定位】**
+- 定位：KivyMD 1.2.0 中 `MDSwitch(active=True)` 在 `__init__` 阶段触发 `on_active` 回调，回调内访问 `self.ids.thumb` 执行动画。但 `self.ids` 字典在 `__init__` 链中尚未完全初始化，`ids` 返回一个未就绪的 `super` 对象
+- 报错路径：`selectioncontrol.py:875` → `Animation(...).start(self.ids.thumb)` → `__getattr__` 失败
+
+**【最终方案 — Clock.schedule_once 延迟】**
+```python
+bold_switch = MDSwitch()
+bold_switch.bind(active=lambda _, v: _on_change("bold", v))
+# 延迟到下一帧设置 active，此时 ids 已就绪
+Clock.schedule_once(lambda dt: setattr(bold_switch, 'active', val), 0)
+```
+
+**涉及文件**：
+- `settings_screen.py` — `_add_single_style_section()` 中的 MDSwitch（影响全部 4 组）
+- `main_screen.py` — `edit_username()` 中的 MDSwitch（R30 全局排查发现）
+
+---
+
+### 5.2 Kivy ObjectProperty 拒绝 None 值
+
+**【用户要求】**
+编辑颜色选择"默认"后保存不闪退。
+
+**【尝试1 — 将 ObjectProperty 设为 None】**
+- 方案：`self.func_row_color = tuple(color) if color else None`
+- 结果：闪退，报错 `ValueError: None is not allowed for MainScreen.func_row_color`
+
+**【根因定位】**
+- 定位：Kivy `ObjectProperty` 在默认值为具体类型（如 `(1,1,1,1)` 元组）时，后续赋值 `None` 触发 `Property.check` 拒绝
+- 涉及属性：`username_color`（默认 `(1,0.85,0.4,1)`）、`func_row_color`、`section_header_color`
+
+**【最终方案 — 用 sentinel 值替代 None】**
+```python
+# 用 (0,0,0,0) 兜底，避免 None
+self.func_row_color = tuple(color) if color else (0, 0, 0, 0)
+self.section_header_color = tuple(color) if color else (0, 0, 0, 0)
+
+# username_color 用默认金色兜底
+main_screen.username_color = u_state["color"] if u_state["color"] else (1, 0.85, 0.4, 1)
+```
+
+**涉及文件**：
+- `main_screen.py` — `_apply_func_row_style`、`_apply_section_header_style`
+- `settings_screen.py` — Group 1 `_on_save` 同步 username_color
+
+---
+
+### 5.3 MDChipText 内部转换重置字体属性
+
+**【用户要求】**
+第四组设置卡片标签的颜色/字体/大小/粗体，在主界面生效。
+
+**【尝试1 — 仅延迟恢复颜色】**
+- 方案：`_set_chip_text_color(chip, rgba)` 只设置 `w.color`
+- 结果：颜色生效，但字体大小和粗体不生效
+
+**【根因定位】**
+- 定位：KivyMD 1.2.0 的 `MDChip.add_widget(MDChipText)` 内部将 `MDChipText` 转为普通 `MDLabel`，此过程中颜色、字体、大小、粗体全部重置
+- 原有 `_set_chip_text_color` 只修复了颜色，未修复字体属性
+
+**【最终方案 — 延迟回调一次性恢复全部样式】**
+```python
+def _apply_chip_text_style(chip, rgba, font_size, font_name, bold):
+    for w in chip.walk():
+        if isinstance(w, Label):
+            w.color = rgba
+            w.font_size = font_size
+            w.font_name = font_name or "Roboto"
+            w.bold = bold
+            return
+
+Clock.schedule_once(
+    lambda dt, c=chip, clr=..., fs=..., fn=..., b=...:
+    _apply_chip_text_style(c, clr, fs, fn, b)
+)
+```
+
+**涉及文件**：`note_card.py` — `_set_chip_text_color` → `_apply_chip_text_style`
+
+---
+
+### 5.4 颜色"默认"=None → 夜间模式字号不生效
+
+**【用户要求】**
+夜间模式下选择颜色"默认"+改字号，回到主界面字号应变化。
+
+**【尝试1 — "默认"保存为白色 (1,1,1,1)】**
+- 方案：`_on_save` 中 `list(s_state["color"]) if s_state["color"] else [1, 1, 1, 1]`
+- 结果：选了"默认"后字号字体粗体全部不生效，但选金色等显式颜色时正常
+
+**【根因定位】**
+- 定位：保存为 `[1,1,1,1]` → `_apply_*_style` 走 `if color:` 分支 → 设 `theme_text_color="Custom"` + `text_color=(1,1,1,1)` → 可能触发 KivyMD 内部处理覆盖了字号设置
+- **关键线索**：仅"默认"（=None→白色转换）时失效，显式颜色正常
+
+**【尝试2 — "默认"保存为 None】**
+- 方案：`_on_save` 存 `None`，`_apply_title_suffix_style` 中 color=None 时跳过颜色设置，只设字号
+- 结果：仍然不生效
+
+**【最终方案 — 彻底移除"默认"选项，全部显式颜色】**
+- 方案：`_get_theme_color_options()` 不再返回 `("默认", None)`，改为根据主题返回显式颜色
+- 夜间模式：白色 / 金色 / 天蓝 / 珊瑚橙
+- 日间模式：黑色 / 金色 / 天蓝 / 珊瑚橙
+- 根因消除：不再有 None → 不走任何 None 分支 → 字号字体的设置不再被颜色路径干扰
+
+**涉及文件**：`settings_screen.py` — `_get_theme_color_options()`
+
+---
+
+### 5.5 KivyMD 可折叠区域 expand 失败（adaptive_height 高度拉回 0）
+
+**【用户要求】**
+第四组折叠后再点击展开，内容应可见且图标变回 ▼。
+
+**【尝试1 — opacity + height 切换】**
+- 方案：折叠 `opacity=0, height=0`；展开 `opacity=1, height=_expanded_height`
+- 结果：展开后内容不可见（height=0），但点击空白区域会触发样式变化，说明内容存在但不可见
+
+**【根因定位】**
+- 定位：`section_content` 使用 `adaptive_height: True`。展开时设置 `height = _expanded_height`，但 `adaptive_height` 绑定立即将 `height` 拉回 `minimum_height`。刚设置 `opacity=1` 后，Kivy 还未重新计算 `minimum_height`（仍为 0），导致 `height` 被覆盖为 0
+
+**【尝试2 — 去掉 adaptive_height】**
+- 方案：`size_hint_y: None`
+- 结果：初始页面全部重叠，所有控件堆在一起（高度为 0，无自然布局）
+
+**【最终方案 — 展开时临时关闭 adaptive_height】**
+```python
+def _toggle(*_):
+    if section_content.opacity:
+        section_content._expanded_height = section_content.height or section_content.minimum_height
+        section_content.opacity = 0
+        section_content.height = 0
+        header_btn.text = f"▶ {label_text}"
+    else:
+        section_content.opacity = 1
+        header_btn.text = f"▼ {label_text}"
+        section_content.adaptive_height = False
+        section_content.height = section_content._expanded_height or 200
+        Clock.schedule_once(lambda dt, sc=section_content: setattr(sc, 'adaptive_height', True), 0)
+```
+- 初始保持 `adaptive_height: True`（正常显示）
+- 折叠：opacity 归零 + height 归零
+- 展开：先设 `adaptive_height=False` 阻止自动覆盖 → 手动恢复保存的高度 → 下一帧恢复 `adaptive_height=True`
+
+**涉及文件**：`settings_screen.py` — `_make_collapsible_section()`
+
+---
+
+### 5.6 全局排查清单（R30 贯穿全流程）
+
+| 排查点 | 发现 |
+|---|---|
+| `MDSwitch(active=…)` | `main_screen.py:635` 同样构造参数设置（edit_username），一并修复 |
+| `_set_chip_text_color` → `_apply_chip_text_style` | 函数名变更后 grep 确认 0 残留引用 |
+| 模块级 `COLOR_OPTIONS` | 4 组调用统一切换为 `_get_theme_color_options()` |
+| `list(None)` 风险 | 组1后缀、组4标签 `_on_save` 均已兜底 |
+| `text_color=None`（MDLabel 拒绝） | 组1/组4 所有 `_refresh_preview` 均已加 `if color:` 守卫 |
+| `font_name=""` 空字符串 | 沿用已有 `or "Roboto"` 模式 |
+| 颜色选项主题感知 | 日间给黑色、夜间给白色，不再有"默认" |
+
+### 模型名称
+
+DeepSeek V4 Pro

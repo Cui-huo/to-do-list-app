@@ -122,7 +122,7 @@ KV = """
                             on_release: root.set_sort_created()
 
                 MDLabel:
-                    text: "文字样式"
+                    text: "白天模式文字样式"
                     font_style: "Subtitle1"
                     size_hint_y: None
                     height: dp(32)
@@ -226,6 +226,110 @@ KV = """
                         on_release: root.open_group4_dialog()
 
                 MDLabel:
+                    text: "黑夜模式文字样式"
+                    font_style: "Subtitle1"
+                    size_hint_y: None
+                    height: dp(32)
+
+                MDBoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: dp(48)
+                    padding: dp(8), 0
+                    spacing: dp(12)
+
+                    MDLabel:
+                        text: "标题栏文字"
+                        font_style: "Body1"
+                        size_hint_x: 0.3
+
+                    MDLabel:
+                        text: "用户名 + 的专属便签本"
+                        font_style: "Caption"
+                        theme_text_color: "Hint"
+                        size_hint_x: 0.45
+                        shorten: True
+
+                    MDFlatButton:
+                        text: "编辑"
+                        size_hint_x: 0.25
+                        pos_hint: {"center_y": 0.5}
+                        on_release: root.open_group1_dialog("dark")
+
+                MDBoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: dp(48)
+                    padding: dp(8), 0
+                    spacing: dp(12)
+
+                    MDLabel:
+                        text: "功能栏文字"
+                        font_style: "Body1"
+                        size_hint_x: 0.3
+
+                    MDLabel:
+                        text: "按更新时间 / 便签检索..."
+                        font_style: "Caption"
+                        theme_text_color: "Hint"
+                        size_hint_x: 0.45
+                        shorten: True
+
+                    MDFlatButton:
+                        text: "编辑"
+                        size_hint_x: 0.25
+                        pos_hint: {"center_y": 0.5}
+                        on_release: root.open_group2_dialog("dark")
+
+                MDBoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: dp(48)
+                    padding: dp(8), 0
+                    spacing: dp(12)
+
+                    MDLabel:
+                        text: "分类标题"
+                        font_style: "Body1"
+                        size_hint_x: 0.3
+
+                    MDLabel:
+                        text: "未完成 / 已完成"
+                        font_style: "Caption"
+                        theme_text_color: "Hint"
+                        size_hint_x: 0.45
+
+                    MDFlatButton:
+                        text: "编辑"
+                        size_hint_x: 0.25
+                        pos_hint: {"center_y": 0.5}
+                        on_release: root.open_group3_dialog("dark")
+
+                MDBoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: dp(48)
+                    padding: dp(8), 0
+                    spacing: dp(12)
+
+                    MDLabel:
+                        text: "便签卡片样式"
+                        font_style: "Body1"
+                        size_hint_x: 0.3
+
+                    MDLabel:
+                        text: "标题 / 标签 / 内容"
+                        font_style: "Caption"
+                        theme_text_color: "Hint"
+                        size_hint_x: 0.45
+
+                    MDFlatButton:
+                        text: "编辑"
+                        size_hint_x: 0.25
+                        pos_hint: {"center_y": 0.5}
+                        on_release: root.open_group4_dialog("dark")
+
+                MDLabel:
                     text: "关于\\n便签应用 v0.1.0"
                     font_style: "Body2"
                     size_hint_y: None
@@ -236,6 +340,15 @@ KV = """
 """
 
 Builder.load_string(KV)
+
+
+# ── 双主题文字样式默认值（从 main_screen 导入，key 为基础名） ──
+from app_tool.ui.main_screen import LIGHT_STYLE_DEFAULTS, DARK_STYLE_DEFAULTS
+
+
+def _style_key(base: str, theme: str) -> str:
+    """返回带主题前缀的 UserSettings key。theme="dark" 时加 dark_ 前缀。"""
+    return f"dark_{base}" if theme == "dark" else base
 
 
 class SettingsScreen(MDScreen):
@@ -286,6 +399,11 @@ class SettingsScreen(MDScreen):
         app._apply_titlebar_theme(active)
         self._update_theme_colors()
         self._load_settings()
+        # 同步主界面主题 + 文字样式
+        main_screen = self.manager.get_screen("main")
+        main_screen._update_theme_colors()
+        main_screen._apply_text_styles()
+        main_screen.refresh_list()
 
     def _update_theme_colors(self):
         from kivymd.app import MDApp
@@ -343,11 +461,11 @@ class SettingsScreen(MDScreen):
             )
             app.db_conn.commit()
 
-    def _build_color_buttons(self, selected_rgba, on_select, parent):
-        """构建颜色选择按钮行，根据当前主题过滤选项。"""
+    def _build_color_buttons(self, selected_rgba, on_select, parent, is_dark=None):
+        """构建颜色选择按钮行，根据指定主题过滤选项。"""
         row = MDBoxLayout(orientation="horizontal", spacing=dp(8), adaptive_height=True)
         btns = []
-        for cname, crgba in self._get_theme_color_options():
+        for cname, crgba in self._get_theme_color_options(is_dark=is_dark):
             btn = MDFlatButton(
                 text=cname,
                 size_hint=(None, None),
@@ -398,7 +516,7 @@ class SettingsScreen(MDScreen):
         parent.add_widget(row)
         return btns
 
-    def _add_single_style_section(self, parent, section_label, style_state, on_change):
+    def _add_single_style_section(self, parent, section_label, style_state, on_change, is_dark=None):
         """添加一组样式控制（颜色+字号+粗体+字体），返回按钮引用用于高亮更新。"""
         sec = MDBoxLayout(orientation="vertical", spacing=dp(4), adaptive_height=True)
 
@@ -416,6 +534,7 @@ class SettingsScreen(MDScreen):
             style_state["color"],
             lambda clr: _on_style_change("color", clr),
             sec,
+            is_dark=is_dark,
         )
 
         # 字号
@@ -458,15 +577,19 @@ class SettingsScreen(MDScreen):
 
     # ── 组1：标题栏文字（用户名 + 后缀） ──
 
-    def open_group1_dialog(self):
+    def open_group1_dialog(self, theme="light"):
+        is_dark = (theme == "dark")
         from kivymd.app import MDApp
         app = MDApp.get_running_app()
         main_screen = self.manager.get_screen("main")
         username = main_screen.username or "某某"
 
         # 加载当前样式
-        u_raw = self._load_style_dict("username_style") or {}
-        s_raw = self._load_style_dict("title_suffix_style") or {}
+        defaults = DARK_STYLE_DEFAULTS if is_dark else LIGHT_STYLE_DEFAULTS
+        u_key = _style_key("username_style", theme)
+        s_key = _style_key("title_suffix_style", theme)
+        u_raw = self._load_style_dict(u_key) or defaults.get("username_style", {})
+        s_raw = self._load_style_dict(s_key) or defaults.get("title_suffix_style", {})
 
         u_color = tuple(u_raw["color"]) if u_raw.get("color") else (1, 0.85, 0.4, 1)
         s_color = tuple(s_raw["color"]) if s_raw.get("color") else (1, 1, 1, 1)
@@ -534,8 +657,8 @@ class SettingsScreen(MDScreen):
             else:
                 preview_suffix.theme_text_color = "Primary"
 
-        self._add_single_style_section(content, "用户名样式", u_state, _refresh_preview)
-        self._add_single_style_section(content, "后缀\"的专属便签本\"样式", s_state, _refresh_preview)
+        self._add_single_style_section(content, "用户名样式", u_state, _refresh_preview, is_dark=is_dark)
+        self._add_single_style_section(content, "后缀\"的专属便签本\"样式", s_state, _refresh_preview, is_dark=is_dark)
 
         def _on_save(*_):
             u_save = {
@@ -545,20 +668,25 @@ class SettingsScreen(MDScreen):
             }
             if u_state["color"]:
                 u_save["color"] = list(u_state["color"])
-            self._save_style_dict("username_style", u_save)
-            self._save_style_dict("title_suffix_style", {
+            self._save_style_dict(u_key, u_save)
+            self._save_style_dict(s_key, {
                 "color": list(s_state["color"]) if s_state["color"] else None,
                 "font_size": s_state["font_size"],
                 "font": s_state["font"],
                 "bold": s_state["bold"],
             })
-            # 同步回主界面（默认时用金色兜底，避免 ObjectProperty 拒绝 None）
-            main_screen.username_color = u_state["color"] if u_state["color"] else (1, 0.85, 0.4, 1)
-            main_screen.username_font = u_state["font"]
-            main_screen.username_bold = u_state["bold"]
-            main_screen._apply_title_suffix_style()
-            dialog.dismiss()
-            self._toast("标题栏文字样式已保存")
+            # 仅当编辑当前主题时同步回主界面
+            current_dark = MDApp.get_running_app().theme_cls.theme_style == "Dark"
+            if is_dark == current_dark:
+                main_screen.username_color = u_state["color"] if u_state["color"] else (1, 0.85, 0.4, 1)
+                main_screen.username_font = u_state["font"]
+                main_screen.username_bold = u_state["bold"]
+                main_screen._apply_title_suffix_style()
+                dialog.dismiss()
+                self._toast("标题栏文字样式已保存")
+            else:
+                dialog.dismiss()
+                self._toast("已保存，切换至对应模式可查看效果")
 
         dialog = MDDialog(
             title="编辑：标题栏文字",
@@ -573,9 +701,13 @@ class SettingsScreen(MDScreen):
 
     # ── 组2：功能栏文字 ──
 
-    def open_group2_dialog(self):
+    def open_group2_dialog(self, theme="light"):
+        is_dark = (theme == "dark")
+        from kivymd.app import MDApp
         main_screen = self.manager.get_screen("main")
-        raw = self._load_style_dict("func_row_style") or {}
+        key = _style_key("func_row_style", theme)
+        defaults = DARK_STYLE_DEFAULTS if is_dark else LIGHT_STYLE_DEFAULTS
+        raw = self._load_style_dict(key) or defaults.get("func_row_style", {})
         _color = tuple(raw["color"]) if raw.get("color") else None
         state = {
             "color": _color,
@@ -612,18 +744,23 @@ class SettingsScreen(MDScreen):
             else:
                 preview.theme_text_color = "Primary"
 
-        self._add_single_style_section(content, "", state, _refresh_preview)
+        self._add_single_style_section(content, "", state, _refresh_preview, is_dark=is_dark)
 
         def _on_save(*_):
-            self._save_style_dict("func_row_style", {
+            self._save_style_dict(key, {
                 "color": list(state["color"]) if state["color"] else None,
                 "font_size": state["font_size"],
                 "font": state["font"],
                 "bold": state["bold"],
             })
-            main_screen._apply_func_row_style()
-            dialog.dismiss()
-            self._toast("功能栏文字样式已保存")
+            current_dark = MDApp.get_running_app().theme_cls.theme_style == "Dark"
+            if is_dark == current_dark:
+                main_screen._apply_func_row_style()
+                dialog.dismiss()
+                self._toast("功能栏文字样式已保存")
+            else:
+                dialog.dismiss()
+                self._toast("已保存，切换至对应模式可查看效果")
 
         dialog = MDDialog(
             title="编辑：功能栏文字",
@@ -638,9 +775,13 @@ class SettingsScreen(MDScreen):
 
     # ── 组3：分类标题 ──
 
-    def open_group3_dialog(self):
+    def open_group3_dialog(self, theme="light"):
+        is_dark = (theme == "dark")
+        from kivymd.app import MDApp
         main_screen = self.manager.get_screen("main")
-        raw = self._load_style_dict("section_header_style") or {}
+        key = _style_key("section_header_style", theme)
+        defaults = DARK_STYLE_DEFAULTS if is_dark else LIGHT_STYLE_DEFAULTS
+        raw = self._load_style_dict(key) or defaults.get("section_header_style", {})
         _color = tuple(raw["color"]) if raw.get("color") else None
         state = {
             "color": _color,
@@ -676,18 +817,23 @@ class SettingsScreen(MDScreen):
             else:
                 preview.theme_text_color = "Primary"
 
-        self._add_single_style_section(content, "", state, _refresh_preview)
+        self._add_single_style_section(content, "", state, _refresh_preview, is_dark=is_dark)
 
         def _on_save(*_):
-            self._save_style_dict("section_header_style", {
+            self._save_style_dict(key, {
                 "color": list(state["color"]) if state["color"] else None,
                 "font_size": state["font_size"],
                 "font": state["font"],
                 "bold": state["bold"],
             })
-            main_screen._apply_section_header_style()
-            dialog.dismiss()
-            self._toast("分类标题样式已保存")
+            current_dark = MDApp.get_running_app().theme_cls.theme_style == "Dark"
+            if is_dark == current_dark:
+                main_screen._apply_section_header_style()
+                dialog.dismiss()
+                self._toast("分类标题样式已保存")
+            else:
+                dialog.dismiss()
+                self._toast("已保存，切换至对应模式可查看效果")
 
         dialog = MDDialog(
             title="编辑：分类标题",
@@ -702,10 +848,11 @@ class SettingsScreen(MDScreen):
 
     # ── 组4：便签卡片样式（可折叠 + ScrollView + 预览卡片跟随主题） ──
 
-    def _get_theme_color_options(self):
+    def _get_theme_color_options(self, is_dark=None):
         """根据主题返回颜色选项，全部显式颜色。夜间含白色，日间含黑色。"""
-        from kivymd.app import MDApp
-        is_dark = MDApp.get_running_app().theme_cls.theme_style == "Dark"
+        if is_dark is None:
+            from kivymd.app import MDApp
+            is_dark = MDApp.get_running_app().theme_cls.theme_style == "Dark"
         if is_dark:
             return [
                 ("白色", (1, 1, 1, 1)),
@@ -721,13 +868,16 @@ class SettingsScreen(MDScreen):
                 ("珊瑚橙", (0.91, 0.45, 0.29, 1)),
             ]
 
-    def open_group4_dialog(self):
+    def open_group4_dialog(self, theme="light"):
+        is_dark = (theme == "dark")
         from kivymd.uix.card import MDCard
         from kivymd.uix.scrollview import MDScrollView
         from kivymd.app import MDApp
-        theme = MDApp.get_running_app().theme_cls
+        theme_cls = MDApp.get_running_app().theme_cls
         main_screen = self.manager.get_screen("main")
-        raw = self._load_style_dict("note_card_styles") or {}
+        key = _style_key("note_card_styles", theme)
+        defaults = DARK_STYLE_DEFAULTS if is_dark else LIGHT_STYLE_DEFAULTS
+        raw = self._load_style_dict(key) or defaults.get("note_card_styles", {})
         t_raw = raw.get("title", {})
         g_raw = raw.get("tag", {})
         c_raw = raw.get("content", {})
@@ -836,7 +986,7 @@ class SettingsScreen(MDScreen):
             padding=dp(12),
             elevation=2,
             radius=dp(12),
-            md_bg_color=theme.bg_normal,
+            md_bg_color=theme_cls.bg_normal,
         )
         preview_card.add_widget(card_inner)
         # 卡片高度跟随内容
@@ -903,7 +1053,7 @@ class SettingsScreen(MDScreen):
             container.add_widget(section_content)
             body.add_widget(container)
 
-            self._add_single_style_section(section_content, "", style_state, _refresh_preview)
+            self._add_single_style_section(section_content, "", style_state, _refresh_preview, is_dark=is_dark)
 
         _make_collapsible_section("标题样式", t_state)
         _make_collapsible_section("标签样式", g_state)
@@ -912,7 +1062,7 @@ class SettingsScreen(MDScreen):
         scroll.add_widget(body)
 
         def _on_save(*_):
-            self._save_style_dict("note_card_styles", {
+            self._save_style_dict(key, {
                 "title": {
                     "color": list(t_state["color"]) if t_state["color"] else None,
                     "font_size": t_state["font_size"],
@@ -932,9 +1082,14 @@ class SettingsScreen(MDScreen):
                     "bold": c_state["bold"],
                 },
             })
-            main_screen.refresh_list()
-            dialog.dismiss()
-            self._toast("便签卡片样式已保存")
+            current_dark = MDApp.get_running_app().theme_cls.theme_style == "Dark"
+            if is_dark == current_dark:
+                main_screen.refresh_list()
+                dialog.dismiss()
+                self._toast("便签卡片样式已保存")
+            else:
+                dialog.dismiss()
+                self._toast("已保存，切换至对应模式可查看效果")
 
         dialog = MDDialog(
             title="编辑：便签卡片样式",
