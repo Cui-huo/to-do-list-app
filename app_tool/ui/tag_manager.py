@@ -88,9 +88,13 @@ class TagManagerScreen(MDScreen):
         return app.tag_service, app.note_service
 
     def _toast(self, text: str):
-        snackbar = MDSnackbar()
-        snackbar.text = text
-        snackbar.open()
+        from kivymd.uix.label import MDLabel
+        from kivymd.uix.snackbar import MDSnackbar
+        MDSnackbar(
+            MDLabel(text=text, font_style="Body2"),
+            duration=2,
+            pos_hint={"center_x": 0.5, "center_y": 0.5},
+        ).open()
 
     def refresh_list(self):
         tag_svc, _ = self._get_services()

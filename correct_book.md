@@ -509,3 +509,44 @@ def _toggle(*_):
 ### 模型名称
 
 DeepSeek V4 Pro
+
+---
+
+## 6. 双主题文字样式默认值未生效 — 夜间模式全白、白天模式全黑
+
+### 问题描述与背景
+
+- **日期**：2026-06-23
+- **背景**：实现了白天/黑夜模式各自独立的文字样式系统（10 个 UserSettings key），为两套样式分别设计了美观的显式默认值（金/天蓝/珊瑚橙/黑/白）。但用户运行后发现：夜间模式下所有文字全部显示为白色，白天模式下全部显示为黑色，明显不符合预设的默认配色。
+
+---
+
+### 解决过程
+
+**【用户要求】**
+"黑夜模式中文字样式出现大量白色，白天模式中出现大量黑色文字样式。明显不符合默认值"
+
+**【尝试1 — 定位根因】**
+- 检查 `_apply_*_style()` 方法的完整调用链：`_load_style()` → DB 无记录返回 `None` → `or {}` 兜底
+- `{}` 中 `color` 字段为 `None` → `if color:` 分支不进入
+- 结果：文字保持 KivyMD 主题色（深色模式 = 白色，浅色模式 = 深色）
+- **关键发现**：`LIGHT_DEFAULTS` / `DARK_DEFAULTS` 字典定义在 `settings_screen.py` 中，但 `main_screen.py` 的消费端从未引用它们。默认值"定义但未消费"是根本原因。
+
+**【最终方案】**
+1. 将默认值从 `settings_screen.py` 移到 `main_screen.py`（消费端），重命名为 `LIGHT_STYLE_DEFAULTS` / `DARK_STYLE_DEFAULTS`（key 为基础名，不含 `dark_` 前缀）
+2. 新增 `MainScreen._get_style_default(base_key)` — 根据当前 `theme_style` 选择对应的默认值字典
+3. `_apply_title_suffix_style()`、`_apply_func_row_style()`、`_apply_section_header_style()`：`or {}` → `or self._get_style_default("base_key")`
+4. `_build_note_card()`：`or {}` → `or self._get_style_default("note_card_styles")`
+5. `_load_username_style()`：DB 无记录时 fallback 到默认值，追加显式 `return`（之前静默跳过导致属性保持空字符串）
+6. `_save_username_style()`：修正为 theme-aware key（之前写死 `'username_style'` 无前缀，与 `_load` 的 prefix 逻辑不一致）
+7. `settings_screen.py`：删除旧的 `LIGHT_DEFAULTS` / `DARK_DEFAULTS`，改为 `from app_tool.ui.main_screen import LIGHT_STYLE_DEFAULTS, DARK_STYLE_DEFAULTS`；4 个 `open_groupN_dialog` 的 `or {}` 全部改为 `or defaults.get("base_key", {})`
+8. 连带修复测试：`test_default_font_is_empty`（期望 `""`）→ `test_default_font_is_dongfangdakai`（新默认字体为 `"AlimamaDongFangDaKai"`），因为 `MainScreen.__init__` 调用了 `_load_username_style()` 会立即应用默认值
+
+**涉及文件**：
+- `app_tool/ui/main_screen.py` — 新增 `LIGHT_STYLE_DEFAULTS` + `DARK_STYLE_DEFAULTS` + `_get_style_default()`
+- `app_tool/ui/settings_screen.py` — 导入默认值，4 个 dialog 方法改 fallback
+- `app_tool/tests/test_ui.py` — 更新测试 + 新增 6 个双主题样式测试
+
+### 模型名称
+
+DeepSeek V4 Pro

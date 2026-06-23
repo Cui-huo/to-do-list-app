@@ -42,6 +42,39 @@ DARK_STYLE_DEFAULTS = {
     },
 }
 
+# ── 模版 2：用户个人审美版 ──
+
+LIGHT_STYLE_TEMPLATE2 = {
+    "username_style":       {"color": [1, 0.85, 0.4, 1],       "font_size": "20sp", "font": "Lemibo",                "bold": False},
+    "title_suffix_style":   {"color": [0.91, 0.45, 0.29, 1],   "font_size": "16sp", "font": "AlimamaDongFangDaKai", "bold": False},
+    "func_row_style":       {"color": [0.05, 0.05, 0.05, 1],   "font_size": "16sp", "font": "AlimamaDongFangDaKai", "bold": True},
+    "section_header_style": {"color": [0.39, 0.71, 0.96, 1],   "font_size": "20sp", "font": "AlimamaDongFangDaKai", "bold": False},
+    "note_card_styles": {
+        "title":   {"color": [0.39, 0.71, 0.96, 1], "font_size": "20sp", "font": "Lemibo",                "bold": True},
+        "tag":     {"color": [0.91, 0.45, 0.29, 1], "font_size": "16sp", "font": "Lemibo",                "bold": False},
+        "content": {"color": [0.05, 0.05, 0.05, 1], "font_size": "16sp", "font": "AlimamaDongFangDaKai", "bold": False},
+    },
+}
+
+DARK_STYLE_TEMPLATE2 = {
+    "username_style":       {"color": [1, 0.85, 0.4, 1],       "font_size": "20sp", "font": "Lemibo",                "bold": False},
+    "title_suffix_style":   {"color": [1, 1, 1, 1],             "font_size": "20sp", "font": "AlimamaDongFangDaKai", "bold": False},
+    "func_row_style":       {"color": [1, 1, 1, 1],             "font_size": "14sp", "font": "AlimamaDongFangDaKai", "bold": False},
+    "section_header_style": {"color": [0.39, 0.71, 0.96, 1],   "font_size": "20sp", "font": "AlimamaDongFangDaKai", "bold": False},
+    "note_card_styles": {
+        "title":   {"color": [1, 0.85, 0.4, 1], "font_size": "20sp", "font": "AlimamaDongFangDaKai", "bold": True},
+        "tag":     {"color": [0.91, 0.45, 0.29, 1], "font_size": "16sp", "font": "Lemibo",                "bold": False},
+        "content": {"color": [1, 1, 1, 1],          "font_size": "14sp", "font": "AlimamaDongFangDaKai", "bold": False},
+    },
+}
+
+# ── 内置模版种子数据（首次启动写入 DB） ──
+
+_BUILTIN_TEMPLATES = [
+    {"name": "默认风格", "light": LIGHT_STYLE_DEFAULTS, "dark": DARK_STYLE_DEFAULTS, "builtin": True},
+    {"name": "个人审美", "light": LIGHT_STYLE_TEMPLATE2, "dark": DARK_STYLE_TEMPLATE2, "builtin": True},
+]
+
 KV = """
 <MainScreen>:
 
@@ -417,6 +450,85 @@ class MainScreen(MDScreen):
                 (key, json.dumps(style)),
             )
             app.db_conn.commit()
+
+    def _load_templates(self):
+        """从 UserSettings 加载模板列表。无记录时自动写入内置种子。"""
+        import json
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        if not app or not app.db_conn:
+            return []
+        row = app.db_conn.execute(
+            "SELECT value FROM UserSettings WHERE key='text_templates'"
+        ).fetchone()
+        if row:
+            try:
+                return json.loads(row["value"])
+            except (json.JSONDecodeError, TypeError, ValueError):
+                pass
+        # 首次启动：写入内置模板
+        templates = list(_BUILTIN_TEMPLATES)
+        self._save_templates(templates)
+        return templates
+
+    def _save_templates(self, templates: list):
+        """保存模板列表到 UserSettings。"""
+        import json
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        if app and app.db_conn:
+            app.db_conn.execute(
+                "INSERT OR REPLACE INTO UserSettings (key, value) VALUES ('text_templates', ?)",
+                (json.dumps(templates),),
+            )
+            app.db_conn.commit()
+
+    def apply_template(self, template_index: int):
+        """一键应用文字样式模版：同时覆盖白天+黑夜两套数据并刷新界面。"""
+        templates = self._load_templates()
+        if template_index < 0 or template_index >= len(templates):
+            return False, "模版不存在"
+        t = templates[template_index]
+        for key, style in t["light"].items():
+            self.save_style(key, style)
+        for key, style in t["dark"].items():
+            self.save_style(f"dark_{key}", style)
+        self._apply_text_styles()
+        self._load_username_style()
+        self.refresh_list()
+        return True, t["name"]
+
+    def save_current_as_template(self, name: str):
+        """将当前白天+黑夜样式保存为一套自定义模板。"""
+        if not name or not name.strip():
+            return False, "模板名不能为空"
+        name = name.strip()
+        # 读取当前白天样式
+        light = {}
+        for key in ["username_style", "title_suffix_style", "func_row_style",
+                     "section_header_style", "note_card_styles"]:
+            style = self._load_style(key) or LIGHT_STYLE_DEFAULTS.get(key, {})
+            light[key] = style
+        # 读取当前黑夜样式
+        dark = {}
+        for key in ["username_style", "title_suffix_style", "func_row_style",
+                     "section_header_style", "note_card_styles"]:
+            style = self._load_style(f"dark_{key}") or DARK_STYLE_DEFAULTS.get(key, {})
+            dark[key] = style
+        templates = self._load_templates()
+        templates.append({"name": name, "light": light, "dark": dark, "builtin": False})
+        self._save_templates(templates)
+        return True, name
+
+    def delete_template(self, template_index: int):
+        """删除指定索引的模板。"""
+        templates = self._load_templates()
+        if template_index < 0 or template_index >= len(templates):
+            return False, "模版不存在"
+        name = templates[template_index]["name"]
+        del templates[template_index]
+        self._save_templates(templates)
+        return True, name
 
     def _apply_text_styles(self):
         """从 DB 加载并应用所有文字样式。"""

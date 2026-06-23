@@ -122,6 +122,30 @@ KV = """
                             on_release: root.set_sort_created()
 
                 MDLabel:
+                    text: "文字样式模版"
+                    font_style: "Subtitle1"
+                    size_hint_y: None
+                    height: dp(32)
+
+                MDBoxLayout:
+                    id: template_list
+                    orientation: "vertical"
+                    size_hint_y: None
+                    height: self.minimum_height
+                    adaptive_height: True
+                    spacing: dp(8)
+
+                MDRaisedButton:
+                    id: save_template_btn
+                    text: "+ 保存当前为模版"
+                    size_hint_x: 1
+                    size_hint_y: None
+                    height: dp(40)
+                    md_bg_color: app.theme_cls.primary_color
+                    text_color: 1, 1, 1, 1
+                    on_release: root._on_save_as_template()
+
+                MDLabel:
                     text: "白天模式文字样式"
                     font_style: "Subtitle1"
                     size_hint_y: None
@@ -364,9 +388,12 @@ class SettingsScreen(MDScreen):
         return app.note_service, app.tag_service
 
     def _toast(self, text: str):
-        snackbar = MDSnackbar()
-        snackbar.text = text
-        snackbar.open()
+        from kivymd.uix.label import MDLabel
+        MDSnackbar(
+            MDLabel(text=text, font_style="Body2"),
+            duration=2,
+            pos_hint={"center_x": 0.5, "center_y": 0.5},
+        ).open()
 
     def _load_settings(self):
         note_svc, _ = self._get_services()
@@ -389,6 +416,159 @@ class SettingsScreen(MDScreen):
             self.ids.sort_updated_btn.text_color = (1, 1, 1, 1)
             self.ids.sort_created_btn.md_bg_color = inactive_bg
             self.ids.sort_created_btn.text_color = inactive_text
+
+        # 生成文字样式模版按钮
+        self._load_template_buttons()
+
+    def _load_template_buttons(self):
+        """在 template_list 中动态生成模板行（名称 + 使用/删除/编辑按钮）。"""
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        main_screen = self.manager.get_screen("main")
+        templates = main_screen._load_templates()
+        container = self.ids.template_list
+        container.clear_widgets()
+        for i, t in enumerate(templates):
+            row = MDBoxLayout(
+                orientation="horizontal",
+                size_hint_y=None,
+                height=dp(40),
+                spacing=dp(6),
+            )
+            # 模版名
+            row.add_widget(MDLabel(
+                text=t["name"],
+                font_style="Body1",
+                size_hint_x=0.3,
+                halign="left",
+                valign="center",
+                shorten=True,
+            ))
+            # 使用按钮
+            use_btn = MDFlatButton(
+                text="使用",
+                size_hint_x=0.2,
+                on_release=lambda _, idx=i: self._on_apply_template(idx),
+            )
+            row.add_widget(use_btn)
+            # 删除按钮
+            del_btn = MDFlatButton(
+                text="删除",
+                size_hint_x=0.2,
+                theme_text_color="Error",
+                on_release=lambda _, idx=i: self._on_delete_template(idx),
+            )
+            row.add_widget(del_btn)
+            # 编辑名称按钮
+            edit_btn = MDFlatButton(
+                text="编辑",
+                size_hint_x=0.2,
+                on_release=lambda _, idx=i: self._on_rename_template(idx),
+            )
+            row.add_widget(edit_btn)
+            container.add_widget(row)
+
+    def _on_apply_template(self, template_index: int):
+        """点击使用按钮：写入 DB + 刷新主界面。"""
+        main_screen = self.manager.get_screen("main")
+        ok, name = main_screen.apply_template(template_index)
+        if ok:
+            self._toast(f"已应用「{name}」模版")
+            self._load_settings()
+
+    def _on_rename_template(self, template_index: int):
+        """弹出名称输入框，修改模版名称。"""
+        main_screen = self.manager.get_screen("main")
+        templates = main_screen._load_templates()
+        if template_index < 0 or template_index >= len(templates):
+            return
+        old_name = templates[template_index]["name"]
+        from kivymd.uix.textfield import MDTextField
+        content = MDBoxLayout(orientation="vertical", spacing=dp(8), padding=dp(12), adaptive_height=True)
+        name_field = MDTextField(hint_text="输入新名称", text=old_name, max_text_length=20)
+        content.add_widget(name_field)
+        dialog = MDDialog(
+            title="编辑模版名称",
+            type="custom",
+            content_cls=content,
+            buttons=[
+                MDFlatButton(text="取消", on_release=lambda *_: dialog.dismiss()),
+                MDFlatButton(text="保存", on_release=lambda *_: self._do_rename_template(
+                    template_index, name_field.text.strip(), dialog)),
+            ],
+        )
+        dialog.open()
+
+    def _do_rename_template(self, template_index: int, new_name: str, dialog):
+        if not new_name:
+            self._toast("名称不能为空")
+            return
+        main_screen = self.manager.get_screen("main")
+        templates = main_screen._load_templates()
+        templates[template_index]["name"] = new_name
+        main_screen._save_templates(templates)
+        dialog.dismiss()
+        self._toast("模版名已更新")
+        self._load_template_buttons()
+
+    def _on_save_as_template(self):
+        """弹出名称输入框，保存当前样式为自定义模版。"""
+        from kivymd.uix.textfield import MDTextField
+        content = MDBoxLayout(orientation="vertical", spacing=dp(8), padding=dp(12), adaptive_height=True)
+        content.add_widget(MDLabel(
+            text="保存当前白天+黑夜文字样式为模版",
+            font_style="Body2",
+            theme_text_color="Secondary",
+            adaptive_height=True,
+        ))
+        name_field = MDTextField(hint_text="输入模版名称", max_text_length=20)
+        content.add_widget(name_field)
+        dialog = MDDialog(
+            title="保存为模版",
+            type="custom",
+            content_cls=content,
+            buttons=[
+                MDFlatButton(text="取消", on_release=lambda *_: dialog.dismiss()),
+                MDFlatButton(text="保存", on_release=lambda *_: self._do_save_template(name_field.text.strip(), dialog)),
+            ],
+        )
+        dialog.open()
+
+    def _do_save_template(self, name: str, dialog):
+        if not name:
+            self._toast("模版名不能为空")
+            return
+        main_screen = self.manager.get_screen("main")
+        ok, saved_name = main_screen.save_current_as_template(name)
+        if ok:
+            dialog.dismiss()
+            self._toast(f"模版「{saved_name}」已保存")
+            self._load_template_buttons()
+
+    def _on_delete_template(self, template_index: int):
+        """确认后删除模版。"""
+        main_screen = self.manager.get_screen("main")
+        templates = main_screen._load_templates()
+        if template_index < 0 or template_index >= len(templates):
+            return
+        name = templates[template_index]["name"]
+        dialog = MDDialog(
+            title="确认删除",
+            text=f"确认删除模版「{name}」？\n此操作不可撤销。",
+            buttons=[
+                MDFlatButton(text="取消", on_release=lambda *_: dialog.dismiss()),
+                MDFlatButton(text="确认删除", on_release=lambda *_: self._do_delete_template(template_index, dialog)),
+            ],
+        )
+        dialog.open()
+
+    def _do_delete_template(self, template_index: int, dialog):
+        main_screen = self.manager.get_screen("main")
+        ok, name = main_screen.delete_template(template_index)
+        if ok:
+            dialog.dismiss()
+            self._toast(f"模版「{name}」已删除")
+            self._load_template_buttons()
 
     def toggle_dark_mode(self, switch, active):
         from kivymd.app import MDApp
@@ -580,6 +760,10 @@ class SettingsScreen(MDScreen):
     def open_group1_dialog(self, theme="light"):
         is_dark = (theme == "dark")
         from kivymd.app import MDApp
+        current_dark = MDApp.get_running_app().theme_cls.theme_style == "Dark"
+        if is_dark != current_dark:
+            self._toast("请关闭黑夜模式，再点击进行文字样式编辑！" if current_dark else "请开启黑夜模式，再点击进行文字样式编辑！")
+            return
         app = MDApp.get_running_app()
         main_screen = self.manager.get_screen("main")
         username = main_screen.username or "某某"
@@ -704,6 +888,10 @@ class SettingsScreen(MDScreen):
     def open_group2_dialog(self, theme="light"):
         is_dark = (theme == "dark")
         from kivymd.app import MDApp
+        current_dark = MDApp.get_running_app().theme_cls.theme_style == "Dark"
+        if is_dark != current_dark:
+            self._toast("请关闭黑夜模式，再点击进行文字样式编辑！" if current_dark else "请开启黑夜模式，再点击进行文字样式编辑！")
+            return
         main_screen = self.manager.get_screen("main")
         key = _style_key("func_row_style", theme)
         defaults = DARK_STYLE_DEFAULTS if is_dark else LIGHT_STYLE_DEFAULTS
@@ -778,6 +966,10 @@ class SettingsScreen(MDScreen):
     def open_group3_dialog(self, theme="light"):
         is_dark = (theme == "dark")
         from kivymd.app import MDApp
+        current_dark = MDApp.get_running_app().theme_cls.theme_style == "Dark"
+        if is_dark != current_dark:
+            self._toast("请关闭黑夜模式，再点击进行文字样式编辑！" if current_dark else "请开启黑夜模式，再点击进行文字样式编辑！")
+            return
         main_screen = self.manager.get_screen("main")
         key = _style_key("section_header_style", theme)
         defaults = DARK_STYLE_DEFAULTS if is_dark else LIGHT_STYLE_DEFAULTS
@@ -870,6 +1062,11 @@ class SettingsScreen(MDScreen):
 
     def open_group4_dialog(self, theme="light"):
         is_dark = (theme == "dark")
+        from kivymd.app import MDApp
+        current_dark = MDApp.get_running_app().theme_cls.theme_style == "Dark"
+        if is_dark != current_dark:
+            self._toast("请关闭黑夜模式，再点击进行文字样式编辑！" if current_dark else "请开启黑夜模式，再点击进行文字样式编辑！")
+            return
         from kivymd.uix.card import MDCard
         from kivymd.uix.scrollview import MDScrollView
         from kivymd.app import MDApp
