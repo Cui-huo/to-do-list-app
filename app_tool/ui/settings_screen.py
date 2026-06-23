@@ -13,16 +13,6 @@ from kivymd.uix.button import MDIconButton, MDRaisedButton, MDFlatButton
 from kivymd.uix.toolbar import MDTopAppBar
 from kivymd.uix.dialog import MDDialog
 
-# 颜色预设
-COLOR_OPTIONS = [
-    ("默认", None),
-    ("白色", (1, 1, 1, 1)),
-    ("金色", (1, 0.85, 0.4, 1)),
-    ("天蓝", (0.39, 0.71, 0.96, 1)),
-    ("珊瑚橙", (0.91, 0.45, 0.29, 1)),
-    ("深灰", (0.2, 0.2, 0.2, 1)),
-]
-
 # 字号预设
 FONT_SIZE_OPTIONS = [
     ("特大", "20sp"),

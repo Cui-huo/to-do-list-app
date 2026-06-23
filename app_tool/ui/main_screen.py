@@ -386,9 +386,6 @@ class MainScreen(MDScreen):
         super().__init__(**kwargs)
         self._completed_expanded = False
         self._current_search_params: dict | None = None
-        self._dragged_card: NoteCard | None = None
-        self._ghost_card = None
-        self._drag_touch_uid: int | None = None
         self._load_username()
         self._load_username_style()
 
@@ -935,120 +932,8 @@ class MainScreen(MDScreen):
             on_complete_toggle=lambda c: self._handle_complete_toggle(c),
             on_edit=lambda c: self._handle_edit(c),
             on_delete=lambda c: self._handle_delete(c),
-            on_drag_start=lambda c, touch: self._on_card_drag_start(c, touch),
         )
         return card
-
-    def _on_card_drag_start(self, card: NoteCard, touch):
-        """长按卡片开始拖拽排序 —— 幽灵卡方案，零布局重算。"""
-        if self._dragged_card is not None:
-            return
-        if card.is_completed:
-            self._toast("已完成便签不支持拖拽排序")
-            return
-        if card.parent is None:
-            return
-
-        self._toast("拖拽排序：拖动便签到目标位置后松手")
-
-        touch.grab(self)
-        self._drag_touch_uid = touch.uid
-
-        # 原卡片变半透明 + 提升 elevation（零布局重算）
-        card.opacity = 0.4
-        card.elevation = 8
-        self._dragged_card = card
-
-        # 创建幽灵卡片（轻量占位卡，仅含标题文字）
-        from kivymd.uix.card import MDCard
-        ghost_bg = list(self.theme_cls.bg_normal)
-        ghost_bg[3] = 0.92
-        ghost = MDCard(
-            size_hint=(None, None),
-            size=(card.width, dp(48)),
-            md_bg_color=ghost_bg,
-            elevation=12,
-            radius=(dp(12), dp(12), dp(12), dp(12)),
-            padding=(dp(12), dp(8), dp(12), dp(8)),
-        )
-        ghost_label = MDLabel(
-            text=card.note_title or "（无标题）",
-            font_style="Subtitle1",
-            bold=True,
-            size_hint_y=None,
-            height=dp(24),
-            shorten=True,
-            shorten_from="right",
-        )
-        ghost.add_widget(ghost_label)
-
-        # 定位幽灵卡 — 初始位置在卡片中心
-        card_center_w = card.to_window(card.width / 2, card.height / 2)
-        card_center_self = self.to_widget(*card_center_w)
-        ghost.center_x = card_center_self[0]
-        ghost.center_y = card_center_self[1]
-
-        self.add_widget(ghost)
-        self._ghost_card = ghost
-
-        self.ids.scroll_view.do_scroll = False
-
-    def on_touch_move(self, touch):
-        if self._ghost_card and touch.uid == self._drag_touch_uid:
-            self._ghost_card.center_x = touch.x
-            self._ghost_card.center_y = touch.y
-            return True
-        return super().on_touch_move(touch)
-
-    def on_touch_up(self, touch):
-        if self._dragged_card and self._ghost_card and touch.uid == self._drag_touch_uid:
-            card = self._dragged_card
-            ghost = self._ghost_card
-            self._drag_touch_uid = None
-
-            note_svc, _, _ = self._get_services()
-            incomplete_box = self.ids.incomplete_box
-            remaining_cards = [
-                c for c in incomplete_box.children
-                if isinstance(c, NoteCard) and c.note_id != card.note_id
-            ]
-
-            # 幽灵卡中心 Y — 统一走 to_window 确保在窗口坐标系比较
-            ghost_wy = self.to_window(touch.x, touch.y)[1]
-
-            def _card_wy(c):
-                """卡片中心在窗口坐标系中的 Y。"""
-                return c.to_window(c.width / 2, c.height / 2)[1]
-
-            remaining_sorted = sorted(
-                remaining_cards, key=_card_wy, reverse=True
-            )
-
-            new_order = []
-            inserted = False
-            for other in remaining_sorted:
-                other_wy = _card_wy(other)
-                if not inserted and ghost_wy > other_wy:
-                    new_order.append(card.note_id)
-                    inserted = True
-                new_order.append(other.note_id)
-            if not inserted:
-                new_order.append(card.note_id)
-
-            note_svc.rebalance_positions(new_order)
-
-            # 恢复原卡片
-            card.opacity = 1
-            card.elevation = 2 if not card.is_completed else 0
-
-            # 销毁幽灵卡片
-            self.remove_widget(ghost)
-            self._dragged_card = None
-            self._ghost_card = None
-            self.ids.scroll_view.do_scroll = True
-            self.refresh_list()
-            return True
-        return super().on_touch_up(touch)
 
     def _toast(self, text: str):
         from kivymd.uix.label import MDLabel

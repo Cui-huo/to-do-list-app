@@ -218,9 +218,8 @@ class NoteService:
         assert updated is not None
         return updated
 
-    # ── 拖拽排序 ──
-
     def set_position(self, note_id: int, position: float) -> Note:
+        """设置便签排序位置。"""
         note = self.get_by_id(note_id)
         if note is None:
             raise ValueError(f"便签 ID={note_id} 不存在")
@@ -231,14 +230,6 @@ class NoteService:
         updated = self.get_by_id(note_id)
         assert updated is not None
         return updated
-
-    def rebalance_positions(self, note_ids: list[int]) -> None:
-        """批量重整 position：间隔 1.0 重新分配（精度耗尽时调用）。"""
-        for i, nid in enumerate(note_ids):
-            self.conn.execute(
-                "UPDATE Note SET position=? WHERE id=?", (float(len(note_ids) - i), nid)
-            )
-        self.conn.commit()
 
     # ── 排序查询 ──
 

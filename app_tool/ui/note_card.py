@@ -7,7 +7,6 @@ from kivy.properties import (
     StringProperty, NumericProperty, BooleanProperty, ObjectProperty,
 )
 from kivymd.uix.card import MDCard
-from kivymd.uix.behaviors import TouchBehavior
 from kivymd.uix.chip import MDChip, MDChipText
 from kivymd.uix.label import MDLabel
 from kivymd.uix.button import MDIconButton
@@ -125,7 +124,7 @@ def _apply_chip_text_style(chip, rgba, font_size, font_name, bold):
             return
 
 
-class NoteCard(MDCard, TouchBehavior):
+class NoteCard(MDCard):
     note_id = NumericProperty(0)
     note_title = StringProperty("")
     note_content = StringProperty("")
@@ -152,9 +151,7 @@ class NoteCard(MDCard, TouchBehavior):
         self.register_event_type("on_complete_toggle")
         self.register_event_type("on_edit")
         self.register_event_type("on_delete")
-        self.register_event_type("on_drag_start")
         super().__init__(**kwargs)
-        self.duration_long_touch = 0.5
         Clock.schedule_once(lambda dt: self._apply_visual_state(), 0)
         Clock.schedule_once(lambda dt: self.on_tag_names(None, self.tag_names), 0)
 
@@ -226,14 +223,6 @@ class NoteCard(MDCard, TouchBehavior):
             return content[:77] + "..."
         return content
 
-    def on_long_touch(self, touch, *args):
-        """长按触发拖拽排序（仅限卡片主体区域，按钮上不触发）。"""
-        for btn_id in ("pin_btn", "complete_btn", "edit_btn", "delete_btn"):
-            btn = self.ids.get(btn_id)
-            if btn and btn.collide_point(*self.to_widget(touch.x, touch.y)):
-                return
-        self.dispatch("on_drag_start", touch)
-
     def on_pin_toggle(self, *args):
         pass
 
@@ -246,5 +235,3 @@ class NoteCard(MDCard, TouchBehavior):
     def on_delete(self, *args):
         pass
 
-    def on_drag_start(self, *args):
-        pass

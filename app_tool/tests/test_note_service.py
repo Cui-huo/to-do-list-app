@@ -461,41 +461,6 @@ class TestPinNote:
             svc.unpin_note(note.id)
 
 
-class TestDragSort:
-    def test_set_position(self, db_conn):
-        """设置拖拽排序位置。"""
-        from app_tool.model.database import init_db
-        from app_tool.controller.note_service import NoteService
-
-        init_db(db_conn)
-        svc = NoteService(db_conn)
-        note = svc.create(title="排序测试", content="内容")
-        updated = svc.set_position(note.id, 3.5)
-        assert updated.position == 3.5
-
-    def test_rebalance_positions(self, db_conn):
-        """批量重整 position（精度耗尽时调用）。"""
-        from app_tool.model.database import init_db
-        from app_tool.controller.note_service import NoteService
-
-        init_db(db_conn)
-        svc = NoteService(db_conn)
-        n1 = svc.create(title="A", content="a")
-        n2 = svc.create(title="B", content="b")
-        n3 = svc.create(title="C", content="c")
-
-        svc.rebalance_positions([n1.id, n2.id, n3.id])
-
-        positions = {r.id: r.position for r in [
-            svc.get_by_id(n1.id),
-            svc.get_by_id(n2.id),
-            svc.get_by_id(n3.id),
-        ]}
-        assert positions[n1.id] == 3.0
-        assert positions[n2.id] == 2.0
-        assert positions[n3.id] == 1.0
-
-
 class TestSortPreference:
     def test_set_and_get_sort_preference(self, db_conn):
         """设置排序偏好影响 get_incomplete 排序。"""
