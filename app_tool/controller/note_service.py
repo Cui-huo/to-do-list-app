@@ -218,19 +218,6 @@ class NoteService:
         assert updated is not None
         return updated
 
-    def set_position(self, note_id: int, position: float) -> Note:
-        """设置便签排序位置。"""
-        note = self.get_by_id(note_id)
-        if note is None:
-            raise ValueError(f"便签 ID={note_id} 不存在")
-        self.conn.execute(
-            "UPDATE Note SET position=? WHERE id=?", (position, note_id)
-        )
-        self.conn.commit()
-        updated = self.get_by_id(note_id)
-        assert updated is not None
-        return updated
-
     # ── 排序查询 ──
 
     def _get_sort_preference(self) -> str:
@@ -251,7 +238,7 @@ class NoteService:
         self.conn.commit()
 
     def get_incomplete(self) -> list[Note]:
-        """未完成便签：手动置顶 → 标签置顶 → 拖拽 → 时间偏好。"""
+        """未完成便签：手动置顶 → 标签置顶 → 时间偏好。"""
         from app_tool.controller.tag_service import TagService
         tag_svc = TagService(self.conn)
         pinned_tag_names = tag_svc.get_pinned()
@@ -268,8 +255,6 @@ class NoteService:
                 "ORDER BY "
                 "  CASE WHEN n.is_pinned = 1 THEN 0 ELSE 1 END, "
                 f"  CASE WHEN t.name IN ({placeholders}) THEN 0 ELSE 1 END, "
-                "  CASE WHEN n.position > 0 THEN 0 ELSE 1 END, "
-                "  n.position DESC, "
                 f"  {time_col} DESC"
             )
             rows = self.conn.execute(sql, pinned_tag_names).fetchall()
@@ -279,21 +264,17 @@ class NoteService:
                 "SELECT * FROM Note WHERE is_completed = 0 "
                 "ORDER BY "
                 "  CASE WHEN is_pinned = 1 THEN 0 ELSE 1 END, "
-                "  CASE WHEN position > 0 THEN 0 ELSE 1 END, "
-                "  position DESC, "
                 f"  {time_col_no_alias} DESC"
             )
             rows = self.conn.execute(sql).fetchall()
         return [self._row_to_note(r) for r in rows]  # type: ignore[return-value]
 
     def get_completed(self) -> list[Note]:
-        """已完成便签：手动置顶 → 拖拽 → completed_at。"""
+        """已完成便签：手动置顶 → completed_at。"""
         rows = self.conn.execute(
             "SELECT * FROM Note WHERE is_completed = 1 "
             "ORDER BY "
             "  CASE WHEN is_pinned = 1 THEN 0 ELSE 1 END, "
-            "  CASE WHEN position > 0 THEN 0 ELSE 1 END, "
-            "  position DESC, "
             "  completed_at DESC"
         ).fetchall()
         return [self._row_to_note(r) for r in rows]  # type: ignore[return-value]

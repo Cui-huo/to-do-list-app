@@ -151,20 +151,6 @@ class TestCompleteToggle:
         assert completed.is_completed == 1
         assert completed.completed_at is not None
 
-    def test_mark_complete_resets_position(self, db_conn):
-        """标记完成时 position 归零。"""
-        from app_tool.model.database import init_db
-        from app_tool.controller.note_service import NoteService
-
-        init_db(db_conn)
-        svc = NoteService(db_conn)
-        note = svc.create(title="排序后完成", content="内容")
-        svc.set_position(note.id, 5.0)
-        completed = svc.mark_complete(note.id)
-
-        assert completed.is_completed == 1
-        assert completed.position == 0.0
-
     def test_mark_incomplete(self, db_conn):
         """取消完成清除 completed_at，is_completed=0。"""
         from app_tool.model.database import init_db
@@ -286,27 +272,6 @@ class TestSorting:
         assert notes[0].title == "手动置顶"
         assert notes[1].title == "标签置顶"
         assert notes[2].title == "普通"
-
-    def test_position_sorting_within_pinned_group(self, db_conn):
-        """置顶区内按 position DESC 排序。"""
-        from app_tool.model.database import init_db
-        from app_tool.controller.note_service import NoteService
-
-        init_db(db_conn)
-        svc = NoteService(db_conn)
-        n1 = svc.create(title="A", content="a")
-        n2 = svc.create(title="B", content="b")
-
-        svc.pin_note(n1.id)
-        svc.pin_note(n2.id)
-
-        # B 手动排序靠前
-        svc.set_position(n2.id, 10.0)
-        svc.set_position(n1.id, 5.0)
-
-        notes = svc.get_incomplete()
-        assert notes[0].title == "B"
-        assert notes[1].title == "A"
 
     def test_completed_sorted_by_pin_priority(self, db_conn):
         """已完成便签：手动置顶排在前。"""

@@ -106,8 +106,20 @@ class AddEditContent(MDBoxLayout):
             md_bg_color=bg,
         )
         chip.add_widget(MDChipText(text=name, color=tc, theme_text_color="Custom"))
+        # KivyMD 1.2.0 内部转换 MDChipText→MDLabel 后丢失颜色，延迟一帧重新应用
+        Clock.schedule_once(lambda dt, c=chip: self._fix_chip_label_color(c, selected))
         chip.bind(on_press=lambda c, n=name: self._toggle_tag(n))
         return chip
+
+    def _fix_chip_label_color(self, chip, is_active):
+        """运行时读取主题色，解决 KivyMD 1.2.0 转换后颜色丢失。"""
+        from kivy.uix.label import Label
+        from kivymd.app import MDApp
+        theme = MDApp.get_running_app().theme_cls
+        color = (1, 1, 1, 1) if is_active else theme.text_color
+        for w in chip.walk():
+            if isinstance(w, Label):
+                w.color = color
 
     def _toggle_tag(self, name: str):
         if name in self._selected_tags:

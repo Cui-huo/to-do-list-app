@@ -46,18 +46,11 @@ KV = """
                     bold: root.title_bold
                     theme_text_color: "Custom" if root.title_color else "Primary"
                     text_color: root.title_color or (0, 0, 0, 0)
-                    size_hint_x: 0.9
+                    size_hint_x: 1
                     size_hint_y: None
                     height: self.texture_size[1] if self.text else dp(4)
                     shorten: True
                     shorten_from: "right"
-
-                MDIconButton:
-                    id: pin_btn
-                    icon: "pin-outline"
-                    size_hint: None, None
-                    size: dp(40), dp(40)
-                    on_release: root.dispatch("on_pin_toggle")
 
             MDBoxLayout:
                 id: chips_box
@@ -86,27 +79,40 @@ KV = """
                 size_hint_y: None
                 height: dp(44)
                 spacing: dp(4)
-                pos_hint: {"right": 1}
+
+                MDBoxLayout:
+                    spacing: dp(4)
+                    adaptive_width: True
+
+                    MDIconButton:
+                        id: complete_btn
+                        icon: "check-circle"
+                        size_hint: None, None
+                        size: dp(40), dp(40)
+                        on_release: root.dispatch("on_complete_toggle")
+
+                    MDIconButton:
+                        icon: "pencil"
+                        size_hint: None, None
+                        size: dp(40), dp(40)
+                        on_release: root.dispatch("on_edit")
+
+                    MDIconButton:
+                        icon: "delete"
+                        size_hint: None, None
+                        size: dp(40), dp(40)
+                        theme_icon_color: "Error"
+                        on_release: root.dispatch("on_delete")
+
+                Widget:
+                    size_hint_x: 1
 
                 MDIconButton:
-                    id: complete_btn
-                    icon: "check-circle"
+                    id: pin_btn
+                    icon: "pin-outline"
                     size_hint: None, None
                     size: dp(40), dp(40)
-                    on_release: root.dispatch("on_complete_toggle")
-
-                MDIconButton:
-                    icon: "pencil"
-                    size_hint: None, None
-                    size: dp(40), dp(40)
-                    on_release: root.dispatch("on_edit")
-
-                MDIconButton:
-                    icon: "delete"
-                    size_hint: None, None
-                    size: dp(40), dp(40)
-                    theme_icon_color: "Error"
-                    on_release: root.dispatch("on_delete")
+                    on_release: root.dispatch("on_pin_toggle")
 """
 
 Builder.load_string(KV)

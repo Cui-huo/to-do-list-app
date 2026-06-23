@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+from kivy.clock import Clock
 from kivy.lang import Builder
 from kivy.metrics import dp
 from kivy.properties import ObjectProperty, StringProperty, NumericProperty
@@ -237,6 +238,7 @@ class SearchContent(MDBoxLayout):
             color=active_tc if self.time_type == "创建时间" else inactive_tc,
             theme_text_color="Custom",
         ))
+        Clock.schedule_once(lambda dt, c=created_chip: self._fix_chip_label_color(c, self.time_type == "创建时间"))
         created_chip.bind(on_press=lambda *_: self._set_time_type("创建时间"))
 
         completed_chip = MDChip(
@@ -249,6 +251,7 @@ class SearchContent(MDBoxLayout):
             color=active_tc if self.time_type == "完成时间" else inactive_tc,
             theme_text_color="Custom",
         ))
+        Clock.schedule_once(lambda dt, c=completed_chip: self._fix_chip_label_color(c, self.time_type == "完成时间"))
         completed_chip.bind(on_press=lambda *_: self._set_time_type("完成时间"))
 
         box.add_widget(created_chip)
@@ -283,8 +286,19 @@ class SearchContent(MDBoxLayout):
             md_bg_color=bg,
         )
         chip.add_widget(MDChipText(text=name, color=tc, theme_text_color="Custom"))
+        Clock.schedule_once(lambda dt, c=chip: self._fix_chip_label_color(c, selected))
         chip.bind(on_press=lambda c, n=name: self._toggle_tag(n))
         return chip
+
+    def _fix_chip_label_color(self, chip, is_active):
+        """KivyMD 1.2.0 内部转换 MDChipText→MDLabel 后重新应用颜色，运行时读取主题色。"""
+        from kivy.uix.label import Label
+        from kivymd.app import MDApp
+        theme = MDApp.get_running_app().theme_cls
+        color = (1, 1, 1, 1) if is_active else theme.text_color
+        for w in chip.walk():
+            if isinstance(w, Label):
+                w.color = color
 
     def _toggle_tag(self, name: str):
         if name in self._selected_tags:

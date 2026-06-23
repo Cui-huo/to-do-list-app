@@ -909,7 +909,7 @@ class MainScreen(MDScreen):
 
         card = NoteCard(
             note_id=note.id,
-            note_title=note.title or "（无标题）",
+            note_title=note.title or "",
             note_content=note.content,
             tag_names=tag_names,
             is_completed=bool(note.is_completed),

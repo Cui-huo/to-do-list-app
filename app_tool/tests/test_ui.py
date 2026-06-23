@@ -32,16 +32,18 @@ class TestNoteCardButtonSizes:
             f"pin_btn 宽度期望 40dp，实际 {card.ids.pin_btn.size[0]}"
 
     def test_edit_btn_icon_size(self, card):
-        """编辑按钮图标尺寸应为 dp(40) — 操作栏中无 id 的第 2 个按钮"""
+        """编辑按钮图标尺寸应为 dp(40) — 操作栏左组中无 id 的第 2 个按钮"""
         action_box = card.ids.box.children[0]
-        edit_btn = action_box.children[1]
+        left_group = action_box.children[2]  # MDBoxLayout 包裹完成/编辑/删除
+        edit_btn = left_group.children[1]
         assert edit_btn.size[0] == pytest.approx(40, abs=1), \
             f"编辑按钮宽度期望 40dp，实际 {edit_btn.size[0]}"
 
     def test_delete_btn_icon_size(self, card):
-        """删除按钮图标尺寸应为 dp(40) — 操作栏中无 id 的第 3 个按钮"""
+        """删除按钮图标尺寸应为 dp(40) — 操作栏左组中无 id 的第 1 个按钮"""
         action_box = card.ids.box.children[0]
-        delete_btn = action_box.children[0]
+        left_group = action_box.children[2]
+        delete_btn = left_group.children[0]
         assert delete_btn.size[0] == pytest.approx(40, abs=1), \
             f"删除按钮宽度期望 40dp，实际 {delete_btn.size[0]}"
 
