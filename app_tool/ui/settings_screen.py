@@ -794,7 +794,6 @@ class SettingsScreen(MDScreen):
         content = MDBoxLayout(orientation="vertical", spacing=dp(8), padding=dp(12), adaptive_height=True)
 
         # 预览
-        preview_row = MDBoxLayout(orientation="horizontal", spacing=dp(0), adaptive_height=True, adaptive_width=True)
         preview_user = MDLabel(
             text=username,
             font_size=u_state["font_size"],
@@ -817,10 +816,20 @@ class SettingsScreen(MDScreen):
             size_hint_y=None,
             height=dp(32),
         )
-        preview_row.add_widget(preview_user)
-        preview_row.add_widget(preview_suffix)
         content.add_widget(MDLabel(text="预览", font_style="Caption", theme_text_color="Hint", adaptive_height=True))
-        content.add_widget(preview_row)
+        # 预览背景：模拟主界面标题栏蓝色
+        preview_bg = MDBoxLayout(
+            orientation="horizontal",
+            md_bg_color=app.theme_cls.primary_color,
+            padding=dp(8),
+            spacing=dp(0),
+            adaptive_height=True,
+            adaptive_width=True,
+            radius=dp(8),
+        )
+        preview_bg.add_widget(preview_user)
+        preview_bg.add_widget(preview_suffix)
+        content.add_widget(preview_bg)
 
         def _refresh_preview():
             preview_user.text = username
