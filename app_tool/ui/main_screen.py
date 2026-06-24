@@ -988,7 +988,10 @@ class MainScreen(ToastMixin, ServiceMixin, MDScreen):
                         pass
                 for tn in to_remove:
                     note_svc.remove_tag(note.id, tn)
-                self.refresh_list()
+                # 就地更新卡片属性，不触发全量刷新
+                card.note_title = title
+                card.note_content = content
+                card.tag_names = [t.name for t in note_svc.get_tags(note.id)]
             except ValueError as e:
                 self._toast(str(e))
 
