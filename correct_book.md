@@ -1,5 +1,33 @@
-# 错题本
+# 错题本 — 问题解决后记录归档
+本文档专门用于记录解决技术问题的经验教训，沉淀可复用知识。
 
+每次解决完一个技术问题后，必须主动询问：
+1. 「问题是否已解决？」
+2. 若已解决 →「是否需要保存到错题本 `correct_book.md`？」
+
+错题本记录内容按**对话迭代过程**组织，保留用户与 AI 之间的完整交互链路：
+
+1. **问题描述与背景** — 清晰详细的问题描述 + 发生背景
+2. **解决过程（迭代循环）** — 按以下格式记录每一步：
+
+```
+   【用户要求】← 用户提出的原始需求和修改指令
+       ↓
+   【尝试方案】← AI 定位问题根因，提出修复方案并执行
+       ↓
+   【用户反馈】← 用户报告修复结果（成功/失败/新的要求）
+       ↓  （若失败，重复上述循环直到成功）
+   【最终方案】← 经过验证的正确解决方案
+```
+
+每次尝试必须标注：失败原因、关键发现、以及如何导向下一步。
+
+3. **日期** — 问题解决的日期
+4. **模型名称** — 当前与用户对话的底层大模型准确 ID（如 `DeepSeek V4 Pro`）。注意：这里是底层大模型名称，不是工具/平台名称（如 `Qwen Code`）
+
+**Why:** 错题本是个人技术成长的重要资产——记录错误比记录成功更有价值。定期回顾避免重复踩坑。
+
+**How to apply:** 每次 bug 修复、技术难题解决后，在回复末尾附加以上两个追问。待用户确认后，将内容追加写入项目根目录的 `correct_book.md`。
 ---
 
 ## 1. 夜间模式下标题栏（系统状态栏区域）不变黑
@@ -550,3 +578,102 @@ DeepSeek V4 Pro
 ### 模型名称
 
 DeepSeek V4 Pro
+
+---
+
+## 7. 特征测试护航的渐进式代码优化 — 代码去重 + SQL 性能 + UI 增量刷新
+
+### 问题描述与背景
+
+- **日期**：2026-06-24
+- **背景**：便签应用功能已基本完备（特征测试 97 项全绿 + TDD 测试 177 项），但用户反馈操作卡顿严重：创建便签、排序切换、标签管理、批量删除、编辑便签均有明显延迟。同时代码存在多处重复实现。要求在特征测试全绿的前提下，分步安全重构。
+
+---
+
+### 第一阶段：代码去重（风险极低，无性能影响）
+
+**问题：** 5 组方法在多个文件中重复实现。
+
+| 重复方法 | 文件数 | 提取到 |
+|---|---|---|
+| `_toast()` | 3 | `utils.py:ToastMixin` |
+| `_get_services()` | 3 | `utils.py:ServiceMixin._app` |
+| `_fix_chip_label_color` + `_make_chip` | 2 | `chip_utils.py`（模块函数） |
+| `_load_style` / `_load_style_dict` + `save_style` / `_save_style_dict` | 2 | `utils.py:load_setting/save_setting` |
+
+**关键教训：重命名时需保留兼容包装**
+- `MainScreen.save_style()` 和 `MainScreen._load_style()` 被 TDD 测试直接调用
+- 提取为模块函数后测试报 `AttributeError`
+- 修复：在 `MainScreen` 上保留同名包装方法，委托给模块函数
+- **教训**：提取公共方法时，先 grep 所有调用方确认是 `self.method()` 还是模块级引用
+
+---
+
+### 第二阶段：SQL 性能优化（风险极低，消除 N 次数据库往返）
+
+**2.1 — 批量获取标签消除 N+1 查询**
+
+- `refresh_list()` 的 `_build_note_card()` 对每条便签调用 `get_tags(note_id)`（一次 SQL）
+- 新增 `NoteService.get_tags_batch(note_ids)` — 一条 `WHERE nt.note_id IN (...)` 返回 `{note_id: [tag_name, ...]}`
+- `refresh_list()` 在循环前批量查询，传给 `_build_note_card(note, tag_names)`
+- **效果**：N 次 SQL → 1 次
+
+**2.2 — 合并 create() 重复 commit**
+
+- 原代码：`INSERT INTO Note` → `commit()` → `fts_insert()` → `commit()`
+- 修复：`INSERT` → `fts_insert` → `commit()`（一次）
+- `fts_insert` 仅执行 SQL 无独立 commit，两次合并安全
+
+**2.3 — 标签批量删除**
+
+- 原代码：`_execute_batch_delete()` 逐条调用 `tag_svc.delete()` = N 次 `commit`
+- 新增 `TagService.batch_delete(names)` — 一条 `DELETE FROM Tag WHERE name IN (...)` + 一次 `commit`
+- **效果**：N 次 commit → 1 次
+
+---
+
+### 第三阶段：UI 增量刷新（核心收益，但踩坑回退）
+
+**3.1 — 排序切换就地重排 ✅**
+
+- 新增 `_reorder_cards()`：收集现有卡片 → `remove_widget` 取下 → 按新顺序 `add_widget` 放回
+- 0 次 widget 创建，完全复用现有 NoteCard 实例
+- 搜索模式仍走 `refresh_list()`
+
+**3.2 — 创建便签增量添加 ✅**
+
+- 新增 `_add_new_card(note)`：构建单张卡片 → 移除空状态提示 → 找到置顶组之后的位置插入
+- 替代 `refresh_list()` 全量重建
+
+**3.3 — 编辑便签就地更新 ✅**
+
+- `on_save` 回调中直接设 `card.note_title/content/tag_names` Kivy 属性
+- 替代 `refresh_list()` 全量重建
+
+**3.4 — 删除/完成/置顶/撤销增量 ❌ 已回退**
+
+- **尝试**：用 `remove_widget` + `add_widget` 在容器间移动卡片，就地切换 `is_completed`/`is_pinned` 属性
+- **结果**：用户反馈比修改前更卡顿
+- **根因**：阶段二 SQL 优化后 `refresh_list()` 已足够快；增量移动引入了 Kivy 属性回调链 + `children` 遍历 + 容器间跨移，反而更重
+- **教训**：当 SQL 瓶颈消除后，widget 树移动操作的开销可能超过全量重建；不要假设增量一定比全量快
+
+**3.5 — 标签管理页跳过无变化刷新 ✅**
+
+- 新增 `_needs_refresh` 标记：`on_leave` 置 `True`，`refresh_list` 后置 `False`，`on_enter` 按需调用
+- 效果：切回标签管理页时若数据未变，跳过全量行重建
+
+---
+
+### 关键技术点
+
+| 点 | 说明 |
+|---|---|
+| 特征测试 97 项全绿兜底 | 每步完成后跑全量，零回归才继续 |
+| 保留兼容包装 | `save_style`/`_load_style` 留作委托方法 |
+| N+1 消除用 `IN (...)` 批量查询 | 一次 SQL 替代循环查询 |
+| Kivy `remove_widget` 不销毁 widget | 可安全取下再放回（3.1 的核心前提） |
+| widget 树移动不一定比全量快 | 3.4 的回退证明 SQL 优化后 `refresh_list` 就够快 |
+
+### 模型名称
+
+Qwen Code

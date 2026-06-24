@@ -73,6 +73,7 @@ class TagManagerScreen(ToastMixin, ServiceMixin, MDScreen):
         super().__init__(**kwargs)
         self._batch_mode = False
         self._selected_tags: set[str] = set()
+        self._needs_refresh = True
 
     def on_enter(self, *args):
         from kivymd.app import MDApp
@@ -82,7 +83,11 @@ class TagManagerScreen(ToastMixin, ServiceMixin, MDScreen):
             self.ids.top_bar.md_bg_color = theme.bg_dark
         else:
             self.ids.top_bar.md_bg_color = theme.primary_color
-        self.refresh_list()
+        if self._needs_refresh:
+            self.refresh_list()
+
+    def on_leave(self, *args):
+        self._needs_refresh = True
 
     def _get_services(self):
         return self._app.tag_service, self._app.note_service
@@ -111,6 +116,7 @@ class TagManagerScreen(ToastMixin, ServiceMixin, MDScreen):
 
         if self._batch_mode:
             self._add_batch_confirm_button()
+        self._needs_refresh = False
 
     def _build_tag_row(self, name: str, is_pinned: bool) -> MDBoxLayout:
         from kivymd.app import MDApp
