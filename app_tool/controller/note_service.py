@@ -48,7 +48,6 @@ class NoteService:
             (title, content, now, now),
         )
         note_id = cursor.lastrowid
-        self.conn.commit()
         fts_insert(self.conn, note_id, title, content)
         self.conn.commit()
         # spec §5.1: 创建时关联标签，不存在的标签自动跳过
@@ -321,6 +320,22 @@ class NoteService:
             (note_id,),
         ).fetchall()
         return [Tag(id=r["id"], name=r["name"]) for r in rows]
+
+    def get_tags_batch(self, note_ids: list[int]) -> dict[int, list[str]]:
+        """批量获取便签的标签名，一次 SQL 消除 N+1。返回 {note_id: [tag_name, ...]}。"""
+        if not note_ids:
+            return {}
+        placeholders = ",".join("?" * len(note_ids))
+        rows = self.conn.execute(
+            f"SELECT nt.note_id, t.name FROM Tag t "
+            f"INNER JOIN NoteTag nt ON t.id = nt.tag_id "
+            f"WHERE nt.note_id IN ({placeholders}) ORDER BY nt.note_id, t.id",
+            tuple(note_ids),
+        ).fetchall()
+        result: dict[int, list[str]] = {nid: [] for nid in note_ids}
+        for r in rows:
+            result[r["note_id"]].append(r["name"])
+        return result
 
     def get_with_tags(self, note_id: int) -> NoteWithTags | None:
         note = self.get_by_id(note_id)

@@ -9,6 +9,8 @@ from kivymd.uix.label import MDLabel
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.button import MDIconButton, MDFlatButton
 from kivymd.uix.dialog import MDDialog
+
+from app_tool.ui.utils import ToastMixin, ServiceMixin
 from kivymd.uix.textfield import MDTextField
 from kivymd.uix.toolbar import MDTopAppBar
 from kivymd.uix.selectioncontrol import MDCheckbox
@@ -64,7 +66,7 @@ KV = """
 Builder.load_string(KV)
 
 
-class TagManagerScreen(MDScreen):
+class TagManagerScreen(ToastMixin, ServiceMixin, MDScreen):
     tag_list = ObjectProperty(None)
 
     def __init__(self, **kwargs):
@@ -83,18 +85,7 @@ class TagManagerScreen(MDScreen):
         self.refresh_list()
 
     def _get_services(self):
-        from kivymd.app import MDApp
-        app = MDApp.get_running_app()
-        return app.tag_service, app.note_service
-
-    def _toast(self, text: str):
-        from kivymd.uix.label import MDLabel
-        from kivymd.uix.snackbar import MDSnackbar
-        MDSnackbar(
-            MDLabel(text=text, font_style="Body2"),
-            duration=2,
-            pos_hint={"center_x": 0.5, "center_y": 0.5},
-        ).open()
+        return self._app.tag_service, self._app.note_service
 
     def refresh_list(self):
         tag_svc, _ = self._get_services()
@@ -345,11 +336,7 @@ class TagManagerScreen(MDScreen):
         tag_svc, _ = self._get_services()
 
         def on_confirm():
-            for name in list(self._selected_tags):
-                try:
-                    tag_svc.delete(name)
-                except ValueError:
-                    pass
+            tag_svc.batch_delete(list(self._selected_tags))
             self._batch_mode = False
             self._selected_tags.clear()
             self.ids.batch_delete_btn.icon = "delete-sweep"

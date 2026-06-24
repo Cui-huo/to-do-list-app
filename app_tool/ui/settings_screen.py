@@ -9,6 +9,8 @@ from kivymd.uix.snackbar import MDSnackbar
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.label import MDLabel
 from kivymd.uix.selectioncontrol import MDSwitch
+
+from app_tool.ui.utils import ToastMixin, ServiceMixin, load_setting, save_setting
 from kivymd.uix.button import MDIconButton, MDRaisedButton, MDFlatButton
 from kivymd.uix.toolbar import MDTopAppBar
 from kivymd.uix.dialog import MDDialog
@@ -365,7 +367,7 @@ def _style_key(base: str, theme: str) -> str:
     return f"dark_{base}" if theme == "dark" else base
 
 
-class SettingsScreen(MDScreen):
+class SettingsScreen(ToastMixin, ServiceMixin, MDScreen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -373,17 +375,7 @@ class SettingsScreen(MDScreen):
         self._load_settings()
 
     def _get_services(self):
-        from kivymd.app import MDApp
-        app = MDApp.get_running_app()
-        return app.note_service, app.tag_service
-
-    def _toast(self, text: str):
-        from kivymd.uix.label import MDLabel
-        MDSnackbar(
-            MDLabel(text=text, font_style="Body2"),
-            duration=2,
-            pos_hint={"center_x": 0.5, "center_y": 0.5},
-        ).open()
+        return self._app.note_service, self._app.tag_service
 
     def _load_settings(self):
         note_svc, _ = self._get_services()
@@ -605,32 +597,6 @@ class SettingsScreen(MDScreen):
     def _default_style():
         return {"color": None, "font_size": "16sp", "font": "", "bold": False}
 
-    def _load_style_dict(self, key):
-        import json
-        from kivymd.app import MDApp
-        app = MDApp.get_running_app()
-        if app and app.db_conn:
-            row = app.db_conn.execute(
-                "SELECT value FROM UserSettings WHERE key=?", (key,)
-            ).fetchone()
-            if row:
-                try:
-                    return json.loads(row["value"])
-                except (json.JSONDecodeError, TypeError, ValueError):
-                    pass
-        return None
-
-    def _save_style_dict(self, key, style: dict):
-        import json
-        from kivymd.app import MDApp
-        app = MDApp.get_running_app()
-        if app and app.db_conn:
-            app.db_conn.execute(
-                "INSERT OR REPLACE INTO UserSettings (key, value) VALUES (?, ?)",
-                (key, json.dumps(style)),
-            )
-            app.db_conn.commit()
-
     def _build_color_buttons(self, selected_rgba, on_select, parent, is_dark=None):
         """构建颜色选择按钮行，根据指定主题过滤选项。"""
         row = MDBoxLayout(orientation="horizontal", spacing=dp(8), adaptive_height=True)
@@ -762,8 +728,8 @@ class SettingsScreen(MDScreen):
         defaults = DARK_STYLE_DEFAULTS if is_dark else LIGHT_STYLE_DEFAULTS
         u_key = _style_key("username_style", theme)
         s_key = _style_key("title_suffix_style", theme)
-        u_raw = self._load_style_dict(u_key) or defaults.get("username_style", {})
-        s_raw = self._load_style_dict(s_key) or defaults.get("title_suffix_style", {})
+        u_raw = load_setting(u_key) or defaults.get("username_style", {})
+        s_raw = load_setting(s_key) or defaults.get("title_suffix_style", {})
 
         u_color = tuple(u_raw["color"]) if u_raw.get("color") else (1, 0.85, 0.4, 1)
         s_color = tuple(s_raw["color"]) if s_raw.get("color") else (1, 1, 1, 1)
@@ -851,8 +817,8 @@ class SettingsScreen(MDScreen):
             }
             if u_state["color"]:
                 u_save["color"] = list(u_state["color"])
-            self._save_style_dict(u_key, u_save)
-            self._save_style_dict(s_key, {
+            save_setting(u_key, u_save)
+            save_setting(s_key, {
                 "color": list(s_state["color"]) if s_state["color"] else None,
                 "font_size": s_state["font_size"],
                 "font": s_state["font"],
@@ -894,7 +860,7 @@ class SettingsScreen(MDScreen):
         main_screen = self.manager.get_screen("main")
         key = _style_key("func_row_style", theme)
         defaults = DARK_STYLE_DEFAULTS if is_dark else LIGHT_STYLE_DEFAULTS
-        raw = self._load_style_dict(key) or defaults.get("func_row_style", {})
+        raw = load_setting(key) or defaults.get("func_row_style", {})
         _color = tuple(raw["color"]) if raw.get("color") else None
         state = {
             "color": _color,
@@ -934,7 +900,7 @@ class SettingsScreen(MDScreen):
         self._add_single_style_section(content, "", state, _refresh_preview, is_dark=is_dark)
 
         def _on_save(*_):
-            self._save_style_dict(key, {
+            save_setting(key, {
                 "color": list(state["color"]) if state["color"] else None,
                 "font_size": state["font_size"],
                 "font": state["font"],
@@ -972,7 +938,7 @@ class SettingsScreen(MDScreen):
         main_screen = self.manager.get_screen("main")
         key = _style_key("section_header_style", theme)
         defaults = DARK_STYLE_DEFAULTS if is_dark else LIGHT_STYLE_DEFAULTS
-        raw = self._load_style_dict(key) or defaults.get("section_header_style", {})
+        raw = load_setting(key) or defaults.get("section_header_style", {})
         _color = tuple(raw["color"]) if raw.get("color") else None
         state = {
             "color": _color,
@@ -1011,7 +977,7 @@ class SettingsScreen(MDScreen):
         self._add_single_style_section(content, "", state, _refresh_preview, is_dark=is_dark)
 
         def _on_save(*_):
-            self._save_style_dict(key, {
+            save_setting(key, {
                 "color": list(state["color"]) if state["color"] else None,
                 "font_size": state["font_size"],
                 "font": state["font"],
@@ -1073,7 +1039,7 @@ class SettingsScreen(MDScreen):
         main_screen = self.manager.get_screen("main")
         key = _style_key("note_card_styles", theme)
         defaults = DARK_STYLE_DEFAULTS if is_dark else LIGHT_STYLE_DEFAULTS
-        raw = self._load_style_dict(key) or defaults.get("note_card_styles", {})
+        raw = load_setting(key) or defaults.get("note_card_styles", {})
         t_raw = raw.get("title", {})
         g_raw = raw.get("tag", {})
         c_raw = raw.get("content", {})
@@ -1258,7 +1224,7 @@ class SettingsScreen(MDScreen):
         scroll.add_widget(body)
 
         def _on_save(*_):
-            self._save_style_dict(key, {
+            save_setting(key, {
                 "title": {
                     "color": list(t_state["color"]) if t_state["color"] else None,
                     "font_size": t_state["font_size"],

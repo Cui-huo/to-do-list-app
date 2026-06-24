@@ -15,6 +15,7 @@ from kivymd.uix.textfield import MDTextField
 from app_tool.ui.note_card import NoteCard
 from app_tool.ui.dialogs import build_add_edit_dialog, build_confirm_dialog
 from app_tool.ui.search_dialog import build_search_dialog
+from app_tool.ui.utils import ToastMixin, ServiceMixin, load_setting, save_setting
 
 # ── 双主题文字样式默认值（key 为基础名，不含 dark_ 前缀） ──
 
@@ -357,7 +358,7 @@ KV = """
 Builder.load_string(KV)
 
 
-class MainScreen(MDScreen):
+class MainScreen(ToastMixin, ServiceMixin, MDScreen):
     incomplete_box = ObjectProperty(None)
     completed_box = ObjectProperty(None)
     search_bar = ObjectProperty(None)
@@ -420,33 +421,13 @@ class MainScreen(MDScreen):
         defaults = DARK_STYLE_DEFAULTS if prefix == "dark_" else LIGHT_STYLE_DEFAULTS
         return defaults.get(base_key, {})
 
-    def _load_style(self, key):
-        """从 UserSettings 加载文字样式字典，无记录返回 None。"""
-        import json
-        from kivymd.app import MDApp
-        app = MDApp.get_running_app()
-        if app and app.db_conn:
-            row = app.db_conn.execute(
-                "SELECT value FROM UserSettings WHERE key=?", (key,)
-            ).fetchone()
-            if row:
-                try:
-                    return json.loads(row["value"])
-                except (json.JSONDecodeError, TypeError, ValueError):
-                    pass
-        return None
-
     def save_style(self, key, style: dict):
-        """保存文字样式到 UserSettings（供设置页调用）。"""
-        import json
-        from kivymd.app import MDApp
-        app = MDApp.get_running_app()
-        if app and app.db_conn:
-            app.db_conn.execute(
-                "INSERT OR REPLACE INTO UserSettings (key, value) VALUES (?, ?)",
-                (key, json.dumps(style)),
-            )
-            app.db_conn.commit()
+        """保存文字样式到 UserSettings（兼容包装，委托给 save_setting）。"""
+        save_setting(key, style)
+
+    def _load_style(self, key):
+        """从 UserSettings 加载文字样式字典（兼容包装，委托给 load_setting）。"""
+        return load_setting(key)
 
     def _load_templates(self):
         """从 UserSettings 加载模板列表。无记录时自动写入内置种子。"""
@@ -487,9 +468,9 @@ class MainScreen(MDScreen):
             return False, "模版不存在"
         t = templates[template_index]
         for key, style in t["light"].items():
-            self.save_style(key, style)
+            save_setting(key, style)
         for key, style in t["dark"].items():
-            self.save_style(f"dark_{key}", style)
+            save_setting(f"dark_{key}", style)
         self._apply_text_styles()
         self._load_username_style()
         self.refresh_list()
@@ -504,13 +485,13 @@ class MainScreen(MDScreen):
         light = {}
         for key in ["username_style", "title_suffix_style", "func_row_style",
                      "section_header_style", "note_card_styles"]:
-            style = self._load_style(key) or LIGHT_STYLE_DEFAULTS.get(key, {})
+            style = load_setting(key) or LIGHT_STYLE_DEFAULTS.get(key, {})
             light[key] = style
         # 读取当前黑夜样式
         dark = {}
         for key in ["username_style", "title_suffix_style", "func_row_style",
                      "section_header_style", "note_card_styles"]:
-            style = self._load_style(f"dark_{key}") or DARK_STYLE_DEFAULTS.get(key, {})
+            style = load_setting(f"dark_{key}") or DARK_STYLE_DEFAULTS.get(key, {})
             dark[key] = style
         templates = self._load_templates()
         templates.append({"name": name, "light": light, "dark": dark, "builtin": False})
@@ -535,7 +516,7 @@ class MainScreen(MDScreen):
 
     def _apply_title_suffix_style(self):
         prefix = self._get_theme_prefix()
-        style = self._load_style(f"{prefix}title_suffix_style") or self._get_style_default("title_suffix_style")
+        style = load_setting(f"{prefix}title_suffix_style") or self._get_style_default("title_suffix_style")
         label = self.ids.title_suffix_label
         color = style.get("color")
         if color:
@@ -555,7 +536,7 @@ class MainScreen(MDScreen):
 
     def _apply_func_row_style(self):
         prefix = self._get_theme_prefix()
-        style = self._load_style(f"{prefix}func_row_style") or self._get_style_default("func_row_style")
+        style = load_setting(f"{prefix}func_row_style") or self._get_style_default("func_row_style")
         labels = [
             self.ids.sort_label,
             self.ids.func_search_label,
@@ -583,7 +564,7 @@ class MainScreen(MDScreen):
 
     def _apply_section_header_style(self):
         prefix = self._get_theme_prefix()
-        style = self._load_style(f"{prefix}section_header_style") or self._get_style_default("section_header_style")
+        style = load_setting(f"{prefix}section_header_style") or self._get_style_default("section_header_style")
         labels = [self.ids.incomplete_header, self.ids.completed_label]
         color = style.get("color")
         for label in labels:
@@ -852,9 +833,7 @@ class MainScreen(MDScreen):
         dialog.open()
 
     def _get_services(self):
-        from kivymd.app import MDApp
-        app = MDApp.get_running_app()
-        return app.note_service, app.tag_service, app.search_service
+        return self._app.note_service, self._app.tag_service, self._app.search_service
 
     def refresh_list(self):
         note_svc, tag_svc, search_svc = self._get_services()
@@ -870,6 +849,10 @@ class MainScreen(MDScreen):
             incomplete_notes = note_svc.get_incomplete()
             completed_notes = note_svc.get_completed()
 
+        # 批量获取所有便签的标签（一次 SQL 消除 N+1）
+        all_note_ids = [n.id for n in incomplete_notes] + [n.id for n in completed_notes]
+        all_tags = note_svc.get_tags_batch(all_note_ids) if all_note_ids else {}
+
         if not incomplete_notes and not completed_notes:
             empty_label = MDLabel(
                 text="还没有便签，点击右下角 + 创建一个吧",
@@ -884,25 +867,25 @@ class MainScreen(MDScreen):
             return
 
         for note in incomplete_notes:
-            card = self._build_note_card(note)
+            card = self._build_note_card(note, all_tags.get(note.id, []))
             self.ids.incomplete_box.add_widget(card)
 
         self.ids.completed_label.text = f"已完成 ({len(completed_notes)})"
         for note in completed_notes:
-            card = self._build_note_card(note)
+            card = self._build_note_card(note, all_tags.get(note.id, []))
             self.ids.completed_box.add_widget(card)
 
         self._update_undo_btn_visibility()
         self._update_completed_visibility()
 
-    def _build_note_card(self, note) -> NoteCard:
-        note_svc, _, _ = self._get_services()
-        tags = note_svc.get_tags(note.id)
-        tag_names = [t.name for t in tags]
+    def _build_note_card(self, note, tag_names=None) -> NoteCard:
+        if tag_names is None:
+            note_svc, _, _ = self._get_services()
+            tag_names = [t.name for t in note_svc.get_tags(note.id)]
 
         # 从 DB 加载便签卡片样式（标题/标签/内容各自独立）
         prefix = self._get_theme_prefix()
-        card_styles = self._load_style(f"{prefix}note_card_styles") or self._get_style_default("note_card_styles")
+        card_styles = load_setting(f"{prefix}note_card_styles") or self._get_style_default("note_card_styles")
         t = card_styles.get("title", {})
         g = card_styles.get("tag", {})
         c = card_styles.get("content", {})
@@ -935,16 +918,6 @@ class MainScreen(MDScreen):
         )
         return card
 
-    def _toast(self, text: str):
-        from kivymd.uix.label import MDLabel
-        from kivymd.uix.snackbar import MDSnackbar
-
-        MDSnackbar(
-            MDLabel(text=text, font_style="Body2"),
-            duration=2,
-            pos_hint={"center_x": 0.5, "center_y": 0.5},
-        ).open()
-
     # ── 操作处理 ──
 
     def open_add_dialog(self):
@@ -959,7 +932,7 @@ class MainScreen(MDScreen):
                         note_svc.add_tag(note.id, tag_name)
                     except ValueError:
                         pass
-                self.refresh_list()
+                self._add_new_card(note)
                 self._toast("便签创建成功")
             except ValueError as e:
                 self._toast(str(e))
@@ -1029,9 +1002,27 @@ class MainScreen(MDScreen):
         )
         dialog.open()
 
+    def _add_new_card(self, note):
+        """创建便签后增量添加一张卡片，不触发全量刷新。"""
+        note_svc, _, _ = self._get_services()
+        box = self.ids.incomplete_box
+        # 移除空状态提示
+        children = box.children
+        if children and hasattr(children[-1], "text") and "还没有便签" in (children[-1].text or ""):
+            box.remove_widget(children[-1])
+        # 找到正确插入位置：新便签不置顶，排在所有置顶卡片之后
+        insert_idx = 0
+        for i, child in enumerate(children):
+            if not getattr(child, "is_pinned", False):
+                insert_idx = i
+                break
+        tag_names = [t.name for t in note_svc.get_tags(note.id)]
+        card = self._build_note_card(note, tag_names)
+        box.add_widget(card, index=insert_idx)
+        self._update_undo_btn_visibility()
+
     def _handle_delete(self, card: NoteCard):
         note_svc, _, _ = self._get_services()
-        note = note_svc.get_by_id(card.note_id)
 
         def on_confirm():
             note_svc.delete(card.note_id)
@@ -1079,8 +1070,39 @@ class MainScreen(MDScreen):
         new_pref = "created_at" if current == "updated_at" else "updated_at"
         note_svc.set_sort_preference(new_pref)
         self._update_sort_label()
-        self.refresh_list()
-        self._toast(f"排序切换：{self.ids.sort_label.text}")
+        if self._current_search_params:
+            self.refresh_list()
+        else:
+            self._reorder_cards()
+
+    def _reorder_cards(self):
+        """排序切换时复用现有卡片，只重排不重建。"""
+        note_svc, _, _ = self._get_services()
+        # 收集现有卡片
+        existing: dict[int, NoteCard] = {}
+        for box in (self.ids.incomplete_box, self.ids.completed_box):
+            for child in list(box.children):
+                if hasattr(child, "note_id"):
+                    existing[child.note_id] = child
+                    box.remove_widget(child)
+
+        incomplete_notes = note_svc.get_incomplete()
+        completed_notes = note_svc.get_completed()
+
+        all_note_ids = [n.id for n in incomplete_notes] + [n.id for n in completed_notes]
+        all_tags = note_svc.get_tags_batch(all_note_ids) if all_note_ids else {}
+
+        for note in incomplete_notes:
+            card = existing.get(note.id) or self._build_note_card(note, all_tags.get(note.id, []))
+            self.ids.incomplete_box.add_widget(card)
+
+        self.ids.completed_label.text = f"已完成 ({len(completed_notes)})"
+        for note in completed_notes:
+            card = existing.get(note.id) or self._build_note_card(note, all_tags.get(note.id, []))
+            self.ids.completed_box.add_widget(card)
+
+        self._update_undo_btn_visibility()
+        self._update_completed_visibility()
 
     # ── 已完成区折叠 ──
 

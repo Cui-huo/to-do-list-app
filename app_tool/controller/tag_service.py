@@ -75,6 +75,28 @@ class TagService:
             self._save_pinned(pinned)
         self.conn.commit()
 
+    def batch_delete(self, names: list[str]) -> int:
+        """批量删除标签，一条 SQL + 一次 commit。返回实际删除数量。"""
+        if not names:
+            return 0
+        placeholders = ",".join("?" * len(names))
+        cursor = self.conn.execute(
+            f"DELETE FROM Tag WHERE name IN ({placeholders})",
+            tuple(names),
+        )
+        deleted = cursor.rowcount
+        # 从置顶列表中移除
+        pinned = self.get_pinned()
+        changed = False
+        for name in names:
+            if name in pinned:
+                pinned.remove(name)
+                changed = True
+        if changed:
+            self._save_pinned(pinned)
+        self.conn.commit()
+        return deleted
+
     # ── 置顶标签（存储 tag_name 列表，R1 合规）──
 
     def set_pinned(self, tag_names: list[str]) -> None:
