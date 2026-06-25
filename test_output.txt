@@ -1,0 +1,55 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.1.0, pluggy-1.6.0 -- C:\Users\仗剑天涯\Desktop\todo-list-app\.python312\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\仗剑天涯\Desktop\todo-list-app
+collecting ... collected 4 items
+
+app_tool/tests/characterization/test_add_widget_reversal.py::TestAddWidgetReversal::test_add_widget_default_index_reverses_order FAILED [ 25%]
+app_tool/tests/characterization/test_add_widget_reversal.py::TestAddWidgetReversal::test_add_widget_with_explicit_index_preserves_order PASSED [ 50%]
+app_tool/tests/characterization/test_add_widget_reversal.py::TestAffectedLocations::test_refresh_list_lines_missing_index PASSED [ 75%]
+app_tool/tests/characterization/test_add_widget_reversal.py::TestAffectedLocations::test_reorder_cards_lines_missing_index PASSED [100%]
+
+================================== FAILURES ===================================
+_____ TestAddWidgetReversal.test_add_widget_default_index_reverses_order ______
+
+self = <app_tool.tests.characterization.test_add_widget_reversal.TestAddWidgetReversal object at 0x000001E3580D2930>
+
+    def test_add_widget_default_index_reverses_order(self):
+        """FIXME-RED：BoxLayout vertical 中 add_widget 默认 index=0 反转顺序。
+    
+        服务层返回 [newest, mid, oldest]，UI add_widget 逐条插入导致
+        children[0]=oldest（视觉底部），children[-1]=newest（视觉顶部）。
+        预期：children[0] 应为 newest（视觉顶部）。
+        """
+        from kivy.uix.boxlayout import BoxLayout
+        from kivy.uix.label import Label
+    
+        box = BoxLayout(orientation='vertical')
+        l1 = Label(text='first')   # 应排最前
+        l2 = Label(text='second')
+        l3 = Label(text='third')   # 应排最后
+    
+        box.add_widget(l1)
+        box.add_widget(l2)
+        box.add_widget(l3)
+    
+        # Kivy BoxLayout vertical: children[0]=视觉顶部, children[-1]=视觉底部
+        # 默认 index=0 意味着最后 add 的在 children[0]（顶部）
+        # 所以 children = [l3, l2, l1] → 视觉: l3顶部, l1底部
+    
+        # FIXME-RED：预期 l1 在顶部
+>       assert box.children[0].text == 'first', (
+            f"add_widget 默认 index=0 反转顺序: "
+            f"期望 children[0]='first'(顶部)，实际 children[0]='{box.children[0].text}'，"
+            f"children[-1]='{box.children[-1].text}'"
+        )
+E       AssertionError: add_widget 默认 index=0 反转顺序: 期望 children[0]='first'(顶部)，实际 children[0]='third'，children[-1]='first'
+E       assert 'third' == 'first'
+E         
+E         - first
+E         + third
+
+app_tool\tests\characterization\test_add_widget_reversal.py:39: AssertionError
+=========================== short test summary info ===========================
+FAILED app_tool/tests/characterization/test_add_widget_reversal.py::TestAddWidgetReversal::test_add_widget_default_index_reverses_order
+========================= 1 failed, 3 passed in 2.19s =========================

@@ -757,6 +757,90 @@ Qwen Code
 
 ---
 
+## 9. 便签卡片顺序完全反转 — Kivy vertical BoxLayout children 顺序误解
+
+### 日期
+
+2026-06-25
+
+### 模型名称
+
+Qwen Code
+
+### 问题描述与背景
+
+用户报告：所有便签卡片的排列顺序与预期完全相反。手动置顶的卡片跑到了最下面，非置顶卡片按更新时间 DESC 排序也出现在最下面。问题表现为"整个列表完全反转"。
+
+### 解决过程
+
+```
+   【用户要求】← 便签卡片排列顺序完全反转，置顶卡片跑最下面，
+                  非置顶按更新时间应在顶上却在底下
+       ↓
+   【尝试1 — 检查代码中 add_widget 是否缺少 index= 参数】
+   - 发现 fix-branch 已有 index=len(children)，main 分支没有
+   - 推断 fix-branch 代码应该已经修复 → 检查 .pyc 缓存
+   - 清除所有 .pyc 文件，用户重启应用 → 问题依旧
+   - 关键失误：假设 index=len(children) 是正确的修复方向
+       ↓
+   【用户反馈】← 重启后问题仍然存在。指出 ui_spec.md §8.2 已记录此 bug
+       ↓
+   【尝试2 — 深入分析 Kivy 源码 _iterate_layout】
+   - 逐行追踪服务层 SQL（DESC 排序确认正确）→ UI refresh_list → _add_new_card
+   - 所有路径使用 index=len(children)，按假设应该正确
+   - 写独立脚本验证 Kivy 行为 → 断言通过 → 陷入死循环
+   - 用户反问：你真的检查了 Kivy 源码中 BoxLayout vertical 的布局方向吗？
+       ↓
+   【关键突破 — 阅读 Kivy boxlayout.py L285】
+   - vertical 布局: y = padding_bottom + selfy（从底部开始）
+   - for 循环 enumerate(zip(hint, sizes)) 正序遍历 children
+   - children[0] 获得 y = padding_bottom（视觉底部）
+   - children[-1] 获得最高的 y 值（视觉顶部）
+   - 结论：**children[0]=视觉底部，children[-1]=视觉顶部**
+   - 与之前所有假设（children[0]=视觉顶部）完全相反！
+       ↓
+   【最终方案】← 完全反转修复方向
+
+   之前的"修复"（index=len(children)）基于错误假设，反而造成了反转：
+   - index=0（默认 prepend）：保持顺序 → children[-1]=TOP=最新卡片 ✓
+   - index=len(children)（append）：反转顺序 → children[0]=BOTTOM=最新卡片 ❌
+
+   修改清单：
+   | 位置 | 修改 |
+   |------|------|
+   | refresh_list() 3处 | add_widget(x, index=len(...)) → add_widget(x) |
+   | _reorder_cards() 2处 | 同上 |
+   | _add_new_card() | 查找第一个 is_pinned=True（替代 is_pinned=False） |
+   | _handle_complete_toggle() | 同上逻辑修正 |
+   | test_add_widget_reversal.py | 完全重写为反映真实 Kivy 行为 |
+
+   全量测试：365/365 全绿
+```
+
+### 核心教训
+
+**1. 框架源码是唯一真相来源**
+
+当多轮推理都指向"代码正确"但用户坚持问题存在时，说明推理的前提假设有误。本例中，所有分析都建立在"children[0]=视觉顶部"的假设上，而这个假设从未被验证。直到阅读 Kivy `_iterate_layout` 源码（`y = padding_bottom` + 正序遍历），才发现真相完全相反。
+
+**2. 特征测试也会成为"假绿灯"**
+
+`test_add_widget_with_explicit_index_preserves_order` 测试通过了，但它是"假绿灯"——测试验证 `children[0]=='first'`，错误地假定 children[0] 是视觉顶部。实际上 children[0] 是视觉底部，所以视觉顺序是反转的，但断言恰好通过。这印证了错题本已有教训（假绿灯）：测试通过不代表行为正确。
+
+**3. "修复"可能比 bug 更糟糕**
+
+`index=len(children)` 是为了修复 `add_widget()` 默认 index=0 的"反转"而添加的。但默认 index=0 在 vertical BoxLayout 中实际上是正确行为（prepend 使第一个元素最终在 children[-1]=TOP）。这个"修复"本身才是造成反转的根因。
+
+**4. 跨层追踪需要走到最底层**
+
+从 Service SQL → Note 对象 → refresh_list → add_widget → BoxLayout._iterate_layout，只有追踪到 Kivy 源码层才暴露真相。在中间任何一层停止都会得出错误结论。
+
+### 致用户的反思
+
+> "这个错误太隐蔽了。好几轮下来都没检查出来，因为所有人都默认 children[0]=TOP——这是直觉，但 Kivy 的垂直布局偏偏是 children[0]=BOTTOM。我们被自己的假设困住了。多亏你坚持问题存在，让我继续深挖源码，才最终发现这个反直觉的事实。"
+
+---
+
 ## 7.4 test_ui.py 27 个测试因 _load_username() 裸数据库访问崩溃
 
 ### 日期

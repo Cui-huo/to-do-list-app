@@ -878,18 +878,18 @@ class MainScreen(ToastMixin, ServiceMixin, MDScreen):
                     size_hint_y=None,
                     height=dp(200),
                 )
-                inc_box.add_widget(empty_label, index=len(inc_box.children))
+                inc_box.add_widget(empty_label)
                 self.ids.completed_label.text = "已完成 (0)"
                 return
 
             for note in incomplete_notes:
                 card = self._build_note_card(note, all_tags.get(note.id, []))
-                inc_box.add_widget(card, index=len(inc_box.children))
+                inc_box.add_widget(card)
 
             self.ids.completed_label.text = f"已完成 ({len(completed_notes)})"
             for note in completed_notes:
                 card = self._build_note_card(note, all_tags.get(note.id, []))
-                cmp_box.add_widget(card, index=len(cmp_box.children))
+                cmp_box.add_widget(card)
         finally:
             # 恢复自适应高度：一次性触发最终布局
             inc_box.bind(minimum_height=inc_box.setter('height'))
@@ -985,10 +985,10 @@ class MainScreen(ToastMixin, ServiceMixin, MDScreen):
                 card.is_completed = False
                 card._apply_visual_state()
                 inc_box = self.ids.incomplete_box
-                # 插入到置顶卡片之后、非置顶卡片之前
+                # 插入到置顶卡片之后、非置顶卡片之前（Kivy vertical: children[0]=底部）
                 insert_idx = len(inc_box.children)
                 for i, child in enumerate(inc_box.children):
-                    if not getattr(child, "is_pinned", False):
+                    if getattr(child, "is_pinned", False):
                         insert_idx = i
                         break
                 inc_box.add_widget(card, index=insert_idx)
@@ -1059,11 +1059,12 @@ class MainScreen(ToastMixin, ServiceMixin, MDScreen):
         children = box.children
         if children and hasattr(children[-1], "text") and "还没有便签" in (children[-1].text or ""):
             box.remove_widget(children[-1])
-        # 找到正确插入位置：新便签不置顶，排在所有置顶卡片之后
-        # 默认追加到末尾（视觉底部）；若存在非置顶卡片，插到第一个非置顶之前
+        # 找到正确插入位置：新便签排在所有置顶卡片之后（视觉上紧挨置顶区下方）
+        # Kivy vertical BoxLayout: children[0]=视觉底部, children[-1]=视觉顶部
+        # 置顶卡片占据 children 高索引区（TOP），新卡插在第一个置顶卡片位置之前
         insert_idx = len(children)
         for i, child in enumerate(children):
-            if not getattr(child, "is_pinned", False):
+            if getattr(child, "is_pinned", False):
                 insert_idx = i
                 break
         tag_names = [t.name for t in note_svc.get_tags(note.id)]
@@ -1166,11 +1167,11 @@ class MainScreen(ToastMixin, ServiceMixin, MDScreen):
 
             for note in incomplete_notes:
                 card = existing.get(note.id) or self._build_note_card(note, all_tags.get(note.id, []))
-                inc_box.add_widget(card, index=len(inc_box.children))
+                inc_box.add_widget(card)
 
             for note in completed_notes:
                 card = existing.get(note.id) or self._build_note_card(note, all_tags.get(note.id, []))
-                cmp_box.add_widget(card, index=len(cmp_box.children))
+                cmp_box.add_widget(card)
         finally:
             # 恢复自适应高度：一次性触发最终布局
             inc_box.bind(minimum_height=inc_box.setter('height'))
