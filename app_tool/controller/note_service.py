@@ -196,7 +196,8 @@ class NoteService:
             raise ValueError("该便签已置顶")
         now = datetime.now().isoformat()
         self.conn.execute(
-            "UPDATE Note SET is_pinned=1, pinned_at=? WHERE id=?", (now, note_id)
+            "UPDATE Note SET is_pinned=1, pinned_at=?, updated_at=? WHERE id=?",
+            (now, now, note_id),
         )
         self.conn.commit()
         updated = self.get_by_id(note_id)
@@ -237,19 +238,18 @@ class NoteService:
         self.conn.commit()
 
     def get_incomplete(self) -> list[Note]:
-        """未完成便签：手动置顶 → 标签置顶 → 时间偏好。"""
+        """未完成便签：手动置顶 → 标签置顶 → 时间偏好。
+
+        两置顶区均按 updated_at DESC 排序，免疫排序按钮。
+        非置顶区按 sort_preference 排序。
+        """
         from app_tool.controller.tag_service import TagService
-        tag_svc = TagService(self.conn)
-        pinned_tag_names = tag_svc.get_pinned()
+        pinned_tag_names = TagService(self.conn).get_pinned()
         sort_pref = self._get_sort_preference()
-        time_col = "n.updated_at" if sort_pref == "updated_at" else "n.created_at"
+        sort_col = "updated_at" if sort_pref == "updated_at" else "created_at"
 
         if pinned_tag_names:
             placeholders = ",".join("?" * len(pinned_tag_names))
-            # 构建标签位置映射：CASE t.name WHEN 'B' THEN 0 WHEN 'A' THEN 1 ... END
-            tag_pos_cases = " ".join(
-                f"WHEN ? THEN {i}" for i in range(len(pinned_tag_names))
-            )
             sql = (
                 "SELECT DISTINCT n.* FROM Note n "
                 "LEFT JOIN NoteTag nt ON n.id = nt.note_id "
@@ -260,24 +260,20 @@ class NoteService:
                 f"       WHEN t.name IN ({placeholders}) THEN 1"
                 "       ELSE 2"
                 "  END, "
-                "  CASE WHEN n.is_pinned = 1 THEN n.pinned_at END DESC, "
-                f"  CASE WHEN n.is_pinned = 0 AND t.name IN ({placeholders}) THEN"
-                f"    CASE t.name {tag_pos_cases} ELSE 999 END"
-                "  END, "
-                f"  CASE WHEN n.is_pinned = 0 AND t.name IN ({placeholders}) THEN n.updated_at END DESC, "
-                f"  {time_col} DESC"
+                f"  CASE WHEN n.is_pinned = 1 OR t.name IN ({placeholders})"
+                "    THEN n.updated_at END DESC, "
+                f"  CASE WHEN n.is_pinned = 0 AND COALESCE(t.name, '') NOT IN ({placeholders})"
+                f"    THEN n.{sort_col} END DESC"
             )
-            # 参数：3个IN子句 + 1个CASE WHEN标签位置映射
-            params = pinned_tag_names * 4
+            params = pinned_tag_names * 3
             rows = self.conn.execute(sql, params).fetchall()
         else:
-            time_col_no_alias = "updated_at" if sort_pref == "updated_at" else "created_at"
             sql = (
                 "SELECT * FROM Note WHERE is_completed = 0 "
                 "ORDER BY "
                 "  CASE WHEN is_pinned = 1 THEN 0 ELSE 1 END, "
-                "  CASE WHEN is_pinned = 1 THEN pinned_at END DESC, "
-                f"  {time_col_no_alias} DESC"
+                "  CASE WHEN is_pinned = 1 THEN updated_at END DESC, "
+                f"  CASE WHEN is_pinned = 0 THEN {sort_col} END DESC"
             )
             rows = self.conn.execute(sql).fetchall()
         return [self._row_to_note(r) for r in rows]  # type: ignore[return-value]

@@ -282,3 +282,91 @@ class TestCompleteToggleNoFullRebuild:
         assert "已完成 (1)" in screen.ids.completed_label.text, (
             f"预期 '已完成 (1)'，实际 '{screen.ids.completed_label.text}'"
         )
+
+
+class TestCollapsePreservesScrollPosition:
+    """折叠/展开已完成区时不改变内容高度 → 无滚动跳动。
+
+    方案：completed_box 高度始终为 natural height（KV 绑定），
+    折叠仅切换 opacity + disabled，空白占位代替高度=0。
+    """
+
+    def test_collapse_never_changes_completed_box_height(
+        self, kivy_app_instance, svc
+    ):
+        """红灯：_update_completed_visibility 不应设 height=0。
+
+        当前行为（BUG）：折叠时 set height=0，展开时 set height=minimum_height，
+        破坏 KV 绑定 height: self.minimum_height。
+        """
+        import inspect
+        from app_tool.ui.main_screen import MainScreen
+
+        source = inspect.getsource(MainScreen._update_completed_visibility)
+        lines_with_height = [
+            l.strip() for l in source.split('\n')
+            if 'height' in l and 'completed_box' in l
+        ]
+        assert not lines_with_height, (
+            "FIXME-RED：_update_completed_visibility 不应修改 completed_box.height。"
+            "KV 绑定 height: self.minimum_height 已自动处理折叠和展开。"
+            f"违规代码行: {lines_with_height}"
+        )
+
+    def test_collapse_only_toggles_opacity_and_disabled(
+        self, kivy_app_instance, svc
+    ):
+        """红灯：_update_completed_visibility 只应改 opacity 和 disabled。"""
+        import inspect
+        from app_tool.ui.main_screen import MainScreen
+
+        source = inspect.getsource(MainScreen._update_completed_visibility)
+        assert 'opacity' in source, "'opacity' 是必需的"
+        assert 'disabled' in source, (
+            "FIXME-RED：_update_completed_visibility 中无 disabled 切换"
+        )
+
+    def test_collapse_does_not_contain_height_zero(
+        self, kivy_app_instance, svc
+    ):
+        """红灯：源码中不应出现 `height = 0` 或 `height=0`。"""
+        import inspect
+        from app_tool.ui.main_screen import MainScreen
+
+        source = inspect.getsource(MainScreen._update_completed_visibility)
+        assert 'height = 0' not in source.replace(' ', ''), (
+            "FIXME-RED：折叠时不应将 completed_box.height 设为 0。"
+            "内容高度应保持不变。"
+        )
+
+    def test_expand_restores_opacity_and_disabled(
+        self, kivy_app_instance, svc
+    ):
+        """展开后 opacity=1, disabled=False。"""
+        from app_tool.ui.main_screen import MainScreen
+
+        note_svc = svc["note"]
+        tag_svc = svc["tag"]
+        search_svc = svc["search"]
+
+        note_svc.create(title="测试", content="c")
+        note_svc.mark_complete(note_svc.create(title="已完成", content="c").id)
+
+        kivy_app_instance.db_conn = svc["note"].conn
+        kivy_app_instance.note_service = note_svc
+        kivy_app_instance.tag_service = tag_svc
+        kivy_app_instance.search_service = search_svc
+
+        screen = MainScreen()
+        screen.refresh_list()
+
+        # 折叠态
+        screen._completed_expanded = False
+        screen._update_completed_visibility()
+        assert screen.ids.completed_box.opacity == 0, "折叠时 opacity=0"
+
+        # 展开
+        screen._completed_expanded = True
+        screen._update_completed_visibility()
+        assert screen.ids.completed_box.opacity == 1, "展开时 opacity=1"
+        # disabled 可能在 headless 下不生效，跳过实际值检查

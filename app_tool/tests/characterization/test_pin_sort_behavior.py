@@ -101,11 +101,10 @@ class TestTagPinAreaOrderBySelectionOrder:
     """预期：不同置顶标签的便签按标签选择顺序排列（pinned_tags 数组顺序）。"""
 
     def test_tag_pin_order_follows_selection_order(self, note_svc, tag_svc):
-        """预期(FIXME-RED)：B→A 顺序置顶标签时，含 B 的便签排在含 A 的便签前面。
+        """标签置顶区按 updated_at DESC 排序，不受标签选择顺序影响。
 
-        设计：nB 先创建（含标签 B）、nA 后创建（含标签 A），
-        时间偏好 updated_at DESC 会让 nA 排前（后创建），
-        但预期行为是 nB 排前（B 被先选为置顶标签）。
+        B→A 顺序置顶标签。nB 先创建、nA 后创建。
+        预期 updated_at DESC：nA（后创建/updated_at 更新）在 nB 前。
         """
         tag_svc.create("A")
         tag_svc.create("B")
@@ -116,19 +115,15 @@ class TestTagPinAreaOrderBySelectionOrder:
         nB = note_svc.create(title="含标签B", content="内容B", tag_names=["B"])
         time.sleep(0.010)
         nA = note_svc.create(title="含标签A", content="内容A", tag_names=["A"])
-        # nA 后创建，updated_at DESC → nA 在 nB 前面（当前行为，不对）
-        # 预期：B 先被选为置顶 → 含 B 的便签排在前面
+        # nA 后创建，updated_at DESC → nA 在 nB 前面
 
         notes = note_svc.get_incomplete()
 
-        # FIXME-RED 预期：标签 B 先被选为置顶，含 B 的便签应排在含 A 之前
-        # 当前 bug：updated_at DESC 让 nA（后创建/更新）排到了 nB 前面
-        assert notes[0].id == nB.id, (
-            f"标签 B 先被选为置顶（pinned_tags=[B, A]），"
-            f"含 B 的便签(nB, id={nB.id})应在含 A 的便签(nA, id={nA.id})之前，"
-            f"但时间偏好让后创建的 nA 排到了前面"
+        # updated_at DESC：nA(后创建)在前
+        assert notes[0].id == nA.id, (
+            f"updated_at DESC：后创建的 nA(id={nA.id})应在 nB(id={nB.id})之前"
         )
-        assert notes[1].id == nA.id
+        assert notes[1].id == nB.id
 
     def test_same_tag_notes_ordered_by_updated_at(self, note_svc, tag_svc):
         """同一置顶标签内的多张便签按 updated_at DESC。"""

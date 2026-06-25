@@ -64,8 +64,13 @@ def kivy_app():
 
 @pytest.fixture
 def kivy_app_instance(kivy_app):
-    """每个测试获取已初始化的 KivyMD App 实例（确保 _running_app 未丢失）。"""
+    """每个测试获取已初始化的 KivyMD App 实例（确保 _running_app 未丢失）。
+
+    重置 db_conn 为 None，防止前序测试污染导致 MainScreen.__init__
+    中的 _load_username() 访问已关闭连接而崩溃。
+    """
     from kivy.app import App
     if App.get_running_app() is None:
         App._running_app = kivy_app
+    kivy_app.db_conn = None
     return kivy_app

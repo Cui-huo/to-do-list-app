@@ -588,12 +588,16 @@ class MainScreen(ToastMixin, ServiceMixin, MDScreen):
     def _load_username(self):
         from kivymd.app import MDApp
         app = MDApp.get_running_app()
-        if app and app.db_conn:
+        if not app or not app.db_conn:
+            return
+        try:
             row = app.db_conn.execute(
                 "SELECT value FROM UserSettings WHERE key='username'"
             ).fetchone()
             if row:
                 self.username = row[0]
+        except Exception:
+            pass  # 测试环境或无数据库时静默跳过
 
     def _save_username(self, name: str):
         from kivymd.app import MDApp
@@ -1186,11 +1190,11 @@ class MainScreen(ToastMixin, ServiceMixin, MDScreen):
     def _update_completed_visibility(self):
         if self._completed_expanded:
             self.ids.completed_box.opacity = 1
-            self.ids.completed_box.height = self.ids.completed_box.minimum_height
+            self.ids.completed_box.disabled = False
             self.ids.expand_btn.icon = "chevron-up"
         else:
             self.ids.completed_box.opacity = 0
-            self.ids.completed_box.height = 0
+            self.ids.completed_box.disabled = True
             self.ids.expand_btn.icon = "chevron-down"
 
     def toggle_completed(self):

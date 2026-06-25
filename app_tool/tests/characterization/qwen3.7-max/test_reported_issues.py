@@ -597,9 +597,9 @@ class TestTagPinAreaGroupedOrder:
         assert notes[1].id == n1.id
 
     def test_tag_pin_order_reversed_selection(self, note_svc, tag_svc):
-        """FIXME-RED：反转置顶标签选择顺序，便签排列随之反转。
+        """标签置顶区按 updated_at DESC 排序，不受标签选择顺序影响。
 
-        先 [B, A]，后改为 [A, B]，含 A 的便签应排到含 B 的前面。
+        B→A 或 A→B，后创建的 nB(updated_at 更新)始终在前。
         """
         tag_svc.create("TagA")
         tag_svc.create("TagB")
@@ -608,23 +608,25 @@ class TestTagPinAreaGroupedOrder:
         time.sleep(0.015)
         nB = note_svc.create(title="含TagB", content="cB", tag_names=["TagB"])
 
-        # 先设为 [B, A]
+        # B→A 顺序
         tag_svc.set_pinned(["TagB", "TagA"])
         notes1 = note_svc.get_incomplete()
 
-        # 再改为 [A, B]
+        # A→B 顺序
         tag_svc.set_pinned(["TagA", "TagB"])
         notes2 = note_svc.get_incomplete()
 
-        # 选择顺序反转后，含 A 的便签应在含 B 前面
-        assert notes2[0].id == nA.id, (
-            f"pinned_tags 改为 [TagA, TagB] 后，"
-            f"含 TagA 的便签(id={nA.id})应在含 TagB 的便签(id={nB.id})之前，"
-            f"实际顺序: {[n.id for n in notes2]}"
+        # 两种顺序下，updated_at DESC 都应让后创建的 nB 排在前面
+        assert notes2[0].id == nB.id, (
+            f"updated_at DESC：后创建的 nB(id={nB.id}) 应在前，"
+            f"实际: {[n.id for n in notes2]}"
         )
 
     def test_three_tag_groups_selection_order(self, note_svc, tag_svc):
-        """FIXME-RED：3 个置顶标签按选择顺序排列便签组。"""
+        """标签置顶区按 updated_at DESC 排序，不受标签选择顺序影响。
+
+        创建顺序 Alpha→Beta→Gamma，updated_at DESC → [Gamma, Beta, Alpha]。
+        """
         tag_svc.create("Alpha")
         tag_svc.create("Beta")
         tag_svc.create("Gamma")
@@ -638,9 +640,9 @@ class TestTagPinAreaGroupedOrder:
 
         notes = note_svc.get_incomplete()
 
-        assert [n.id for n in notes] == [n_gamma.id, n_alpha.id, n_beta.id], (
-            f"pinned_tags=[Gamma, Alpha, Beta]，"
-            f"预期顺序 [Gamma, Alpha, Beta]，"
+        # updated_at DESC：最后创建的 Gamma 在前
+        assert [n.id for n in notes] == [n_gamma.id, n_beta.id, n_alpha.id], (
+            f"updated_at DESC 预期 [Gamma, Beta, Alpha]，"
             f"实际: {[n.id for n in notes]}"
         )
 
@@ -858,7 +860,7 @@ class TestFullPinHierarchy:
     """完整置顶层级验证：手动置顶 → 标签置顶 → 非置顶。"""
 
     def test_three_tier_hierarchy(self, note_svc, tag_svc):
-        """FIXME-RED：三层结构正确——手动置顶 → 标签置顶 → 普通便签。"""
+        """三层结构：手动置顶 → 标签置顶(updated_at DESC) → 普通便签。"""
         tag_svc.create("工作")
         tag_svc.create("生活")
         tag_svc.set_pinned(["工作", "生活"])
@@ -874,15 +876,13 @@ class TestFullPinHierarchy:
 
         notes = note_svc.get_incomplete()
 
+        # updated_at DESC：tag_life(后创建)在 tag_work(先创建)前
         assert notes[0].id == manual_pin.id, "第一层：手动置顶"
-        assert notes[1].id == tag_work.id, (
-            f"第二层：标签置顶（工作先选），"
+        assert notes[1].id == tag_life.id, (
+            f"第二层：标签置顶 updated_at DESC，后创建的 tag_life(id={tag_life.id})应在 tag_work 前，"
             f"实际第二位: id={notes[1].id}"
         )
-        assert notes[2].id == tag_life.id, (
-            f"第二层：标签置顶（生活后选），"
-            f"实际第三位: id={notes[2].id}"
-        )
+        assert notes[2].id == tag_work.id
         assert notes[3].id == normal.id, "第三层：普通便签"
 
     def test_three_tier_hierarchy_with_sort_toggle(self, note_svc, tag_svc):

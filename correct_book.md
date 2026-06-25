@@ -677,3 +677,131 @@ DeepSeek V4 Pro
 ### 模型名称
 
 Qwen Code
+
+---
+
+## 8. 已完成区折叠/展开视图跳动 — 两轮 TDD 暴露需求澄清不足
+
+### 问题描述与背景
+
+- **日期**：2026-06-25
+- **背景**：便签主界面已完成的卡片默认为折叠状态。用户点击折叠图标展开或折叠已完成区时，出现视图跳动、响应延迟等问题。问题本质是需求澄清不充分——用户知道"我想要什么结果"但无法用技术术语准确表达，AI 按自己的理解直接动手，导致两轮返工。
+
+---
+
+### 第一轮（失败 — AI 误判根因）
+
+**【用户要求（模糊版）】**
+"展开已完成卡片时全部页面刷新。请改为观察视图不动，仅卡片变为展开状态。"
+
+**【尝试方案 — 标记完成时增量更新】**
+- AI 理解：`_handle_complete_toggle` 调用 `refresh_list()` 全量重建是问题
+- 修复：改为增量移动卡片（`remove_widget` + `add_widget`），不调用 `refresh_list()`
+- 连带实现：完成后自动展开已完成区、折叠时保存/恢复 scroll_y
+- 测试：11 个特征测试全绿，全量 323 通过无回归
+
+**【用户反馈】**
+"展开后点击，会产生滚动位置的跳动。折叠时点击，需要 5 秒才能往下滚动，时间过长。"
+
+**【根因分析】**
+- AI 误判了"页面刷新"的原因：用户说的不是 `refresh_list()` 的数据重建，而是视图的**视觉跳动**
+- `_update_completed_visibility` 中设置 `completed_box.height = 0` → `list_box` 内容高度缩小 → ScrollView 重算 → 视图跳
+- "保存/恢复 scroll_y"方案试图用数学补偿来修复高度变化引起的跳动，但引入了 Clock 延迟回调，反而导致 5 秒延迟
+
+---
+
+### 第二轮（成功 — 用户明确需求后一次通过）
+
+**【用户要求（明确版）】**
+"点击折叠按钮时，不论是展开还是折叠，滚动视图下，内容高度不变，滚动位置不变，区别在于展开时卡片为可见可点击状态。折叠时用空白占位，不可点击不可见。"
+
+**【最终方案 — 内容高度永不变化】**
+
+核心思想：`completed_box.height` 始终由 KV 绑定 `height: self.minimum_height` 管理，代码**永不复写**。
+
+| | 修改前 | 修改后 |
+|---|---|---|
+| 展开 | `opacity=1` + `height=minimum_height` | `opacity=1` + `disabled=False` |
+| 折叠 | `opacity=0` + `height=0` + 保存/恢复 scroll_y | `opacity=0` + `disabled=True` |
+
+- 移除 `_restore_scroll_after_collapse` 方法
+- 移除 `Clock.schedule_once` 回调
+- 折叠 = 空白占位（高度保留，opacity=0，disabled=True 阻止触摸穿透）
+- 展开 = 瞬时可见（opacity=1，disabled=False）
+
+**涉及文件**：
+- `app_tool/ui/main_screen.py` — `_update_completed_visibility()` 简化（去 height + 去 scroll 恢复 → 仅 opacity + disabled）
+- `app_tool/tests/characterization/test_complete_toggle_no_refresh.py` — 8 个特征测试
+
+**全量回归**：324 通过，0 新增失败。
+
+---
+
+### 核心教训 — 新增 R33 规则
+
+**关键发现**：两轮 TDD 合计 19 个测试（第一轮 11 个 + 第二轮 8 个）、3 次代码变更（第一轮增量更新 + scroll 恢复 → 第二轮彻底去高度），根因不是 AI 能力不足，而是**需求澄清不充分**。
+
+用户的原始描述"页面刷新"在 AI 脑中映射为 `refresh_list()` 数据重建，但用户实际指的是视觉跳动。如果第一轮开始前就用结构化表格追问 5 个技术维度（内容高度、滚动位置、可见性、可点击性、响应时间），只需一轮即可完成。
+
+这条教训已提炼为 **R33 规则**（写入 `rules/ui_rules.md`）：
+> 当用户需求涉及 UI 交互且表达模糊时，AI 必须在动手前用表格形式逐维度追问（白话解释 + 互斥选项），确认全部细节后再开始 TDD。
+
+**致用户的反思**（用户口述，AI 记录）：
+> "真正限制问题解决的，是我向你描述问题的能力。我不知道'滚动视图'、'滚动位置'这些技术术语的准确含义，也没想清楚'内容高度要不要变'这种细节。但 AI 如果在我说不清楚的时候，能主动问'滚动位置要不要变？内容高度要不要变？'并解释这些词是什么意思，我们根本不需要两轮返工。"
+
+---
+
+### 模型名称
+
+Qwen Code
+
+---
+
+## 7.4 test_ui.py 27 个测试因 _load_username() 裸数据库访问崩溃
+
+### 日期
+
+2026-06-25
+
+### 模型名称
+
+Qwen Code
+
+### 问题描述与背景
+
+全量测试 7 fail + 21 error 集中在 `test_ui.py`，错误均为 `sqlite3.ProgrammingError: Cannot operate on a closed database`，调用栈指向 `main_screen.py:592` 的 `_load_username()`。
+
+56 个测试中 27 个崩溃：
+- **23 个纯 UI 测试**（`TestFuncRowSizes`、`TestUsernameStyle`、`TestSearchBarCloseButton` 等）——仅验证组件尺寸/字体/定位，不该碰数据库，但 `MainScreen.__init__()` 强制调用 `_load_username()` 被牵连
+- **4 个持久化测试**（`TestTextStylePersistence`）——确实需要数据库，但 `kivy_app.db_conn` 被前序测试污染
+
+### 解决过程
+
+```
+   【用户要求】← 分析失败原因，给出方案
+       ↓
+   【尝试方案】← AI 提出 A/B/C 三个方案
+       ↓
+   【用户反馈】← 选 C，立刻修复
+       ↓
+   【最终方案】← 两步修改：
+
+① conftest.py — kivy_app_instance fixture 增加强制重置：
+   kivy_app.db_conn = None  # function 级别，每次测试前清空
+   ↓
+② main_screen.py — _load_username() 增加防御性兜底：
+   if not app or not app.db_conn: return
+   try: ... except Exception: pass
+```
+
+**关键发现：**
+- `if app and app.db_conn:` 守卫对 `None` 有效，但对**已关闭的 sqlite3.Connection 对象**无效（已关闭连接仍为 truthy）
+- session 级别 `kivy_app` fixture 可被前序测试函数体内 `app.db_conn = db_conn` 污染
+- 纯 UI 测试不应因数据库不可用而崩溃
+
+**修复后：** `test_ui.py` 56/56 全绿。
+
+### 沉淀规则
+
+→ `rules/core_rules.md` **R39**：UI 初始化禁止裸数据库访问，必须 `try/except` 防御
+→ `rules/core_rules.md` **R39-A**：测试 conftest 的 `kivy_app_instance` fixture 必须在返回前重置 `kivy_app.db_conn = None`

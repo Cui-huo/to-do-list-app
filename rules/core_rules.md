@@ -263,6 +263,60 @@ spec.md 与代码必须保持一致性。每次修改一端后，必须主动询
 
 **How to apply:** 实现任何功能前，先 grep 全项目查找同名/相似函数，确认是否存在已验证的正确实现。如有，直接复用。开始前必须先读 `correct_book.md` 中与本任务相关的条目。
 
+### R38. 每次修改必做性能检查 — 确保操作流畅度
+AI 对代码的每一次修改（新增功能、重构、优化、bug 修复），必须在完成功能验证后执行性能检查，确保应用操作的流畅度不受影响。
+
+**检查项**：
+| 操作场景 | 检查点 | 阈值 |
+|---|---|---|
+| 创建便签 | 从点击保存到卡片出现在列表 | 无明显卡顿（主观感知 < 300ms） |
+| 编辑便签 | 从点击保存到卡片属性更新 | 无闪烁、无全量重建 |
+| 删除便签 | 从确认删除到卡片消失 | 无卡顿 |
+| 标记完成/取消完成 | 卡片状态切换 | 无卡顿 |
+| 置顶/取消置顶 | 卡片跨区域移动 | 无卡顿、无闪烁 |
+| 排序切换 | 非置顶区重排 | 置顶区无闪烁、标题栏不刷新 |
+| 搜索筛选 | 列表交叉淡入淡出 | 0.2s 内完成 |
+| 标签管理 | 批量删除、置顶切换 | 无 O(N²) 重建 |
+| 撤销操作 | 卡片恢复到列表 | 无卡顿 |
+
+**检查方法**：
+1. 修改代码后运行全量测试 `pytest app_tool/tests/ -v`，确认无回归
+2. 人工或自动化检查关键操作路径中是否存在以下反模式：
+   - 单次操作触发 `clear_widgets()` + 全量重建所有卡片
+   - 循环内逐条 SQL 查询（N+1）
+   - 同一帧内 `Clock.schedule_once` 堆积超过 10 个回调
+   - O(N²) widget 树遍历
+
+**Why:** 2026-06-24 审查发现项目存在 3 层性能瓶颈（全量销毁重建、N+1 SQL、Clock 回调堆积）。功能正确性通过后，性能是用户体验的最后一道防线。每次修改都应确保不引入新的性能退化。
+
+**How to apply:** 每次完成代码修改后，在回复中报告：① 全量测试结果（通过数/失败数）② 是否引入 `clear_widgets()` 全量重建 ③ 是否增加新的 SQL 查询或 Clock 回调。若引入性能退化，必须在同一轮修改中解决。
+
+### R39. UI 初始化禁止裸数据库访问 — 必须防御性兜底
+
+UI 组件的 `__init__`、`on_enter`、`on_kv_post` 等生命周期方法中，**禁止直接访问数据库而不做异常防护**。所有数据库读操作必须包裹在 `try/except` 中，确保在测试环境（`:memory:` 连接已关闭或 `None`）中不会崩溃。
+
+- ❌ `_load_username()` 中 `app.db_conn.execute(...)` 无 try/except → 测试环境 `db_conn` 为已关闭连接时崩溃
+- ✅ `try: row = app.db_conn.execute(...) except Exception: pass`
+- ❌ `on_enter` 中无条件调用 `refresh_list()` 触发 `get_incomplete()` → 无数据库时崩溃
+- ✅ `on_enter` 中先检查 `app.db_conn` 可用再刷新列表
+
+**适用场景（R39-A 增强安全）：** 除业务代码防御外，**测试** `conftest.py` 中 function 级别的 `kivy_app_instance` fixture **必须**在每次返回前执行 `kivy_app.db_conn = None` 重置，作为全局兜底——防止前一测试函数体内 `app.db_conn = db_conn` 赋值在异常路径未恢复时污染后续测试。
+
+```python
+# ✅ conftest.py — 强制重置
+@pytest.fixture
+def kivy_app_instance(kivy_app):
+    from kivy.app import App
+    if App.get_running_app() is None:
+        App._running_app = kivy_app
+    kivy_app.db_conn = None  # ← 强制重置，防污染
+    return kivy_app
+```
+
+**Why:** 2026-06-25 `test_ui.py` 56 个测试中 27 个因 `_load_username()` 裸调用 `app.db_conn.execute()` 崩溃（21 ERROR + 6 FAILED）。根因是 `kivy_app.db_conn` 被前序测试污染为已关闭连接，而 `if app and app.db_conn:` 守卫对已关闭连接对象返回 `True`（已关闭连接 ≠ `None`）。修复方案：① 生产代码加 `try/except`（R39 强制）② conftest 每次重置（R39-A 增强）。修复后 56/56 全绿。
+
+**How to apply:** 编写任何 UI 组件生命周期方法时，先确认是否有数据库访问。若有，必须 `try/except`。编写测试 conftest 时，`kivy_app_instance` 必须重置 `db_conn = None`。
+
 ---
 
 ## 五、可观测性与运维层规则
@@ -321,3 +375,5 @@ spec.md 与代码必须保持一致性。每次修改一端后，必须主动询
 | R35 | 内置优先 | 框架内置功能 | AI行为约束层 |
 | R36 | 问题不清晰先确认 | 禁止猜测 | AI行为约束层 |
 | R37 | 已有实现直接复用 | 禁止重复造轮子 / 先查错题本 | AI行为约束层 |
+| R38 | 每次修改必做性能检查 | 流畅度 / 反模式 | AI行为约束层 |
+| R39 | UI初始化禁止裸数据库访问 | try/except + conftest重置 | AI行为约束层 |

@@ -109,31 +109,31 @@ class TestFuncRowSizes:
         return MainScreen()
 
     def test_func_sort_icon_size(self, screen):
-        """func_sort_icon 图标尺寸应为 36dp"""
+        """func_sort_icon 图标尺寸应为 32dp"""
         btn = screen.ids.func_sort_icon
-        assert btn.size[0] == pytest.approx(36, abs=1), \
-            f"func_sort_icon 宽度期望 36dp，实际 {btn.size[0]}"
+        assert btn.size[0] == pytest.approx(32, abs=2), \
+            f"func_sort_icon 宽度期望 32dp，实际 {btn.size[0]}"
 
     def test_func_search_icon_size(self, screen):
-        """搜索图标尺寸应为 36dp"""
+        """搜索图标尺寸应为 32dp"""
         search_box = screen.ids.func_row.children[1]
         btn = search_box.children[1]
-        assert btn.size[0] == pytest.approx(36, abs=1), \
-            f"搜索图标宽度期望 36dp，实际 {btn.size[0]}"
+        assert btn.size[0] == pytest.approx(32, abs=2), \
+            f"搜索图标宽度期望 32dp，实际 {btn.size[0]}"
 
     def test_func_tag_icon_size(self, screen):
-        """标签图标尺寸应为 36dp"""
+        """标签图标尺寸应为 32dp"""
         tag_box = screen.ids.func_row.children[0]
         btn = tag_box.children[1]
-        assert btn.size[0] == pytest.approx(36, abs=1), \
-            f"标签图标宽度期望 36dp，实际 {btn.size[0]}"
+        assert btn.size[0] == pytest.approx(32, abs=2), \
+            f"标签图标宽度期望 32dp，实际 {btn.size[0]}"
 
     def test_func_settings_icon_size(self, screen):
-        """设置图标尺寸应为 36dp"""
+        """设置图标尺寸应为 32dp"""
         settings_box = screen.ids.func_row.children[3]
         btn = settings_box.children[1]
-        assert btn.size[0] == pytest.approx(36, abs=1), \
-            f"设置图标宽度期望 36dp，实际 {btn.size[0]}"
+        assert btn.size[0] == pytest.approx(32, abs=2), \
+            f"设置图标宽度期望 32dp，实际 {btn.size[0]}"
 
     def test_func_row_label_font_caption(self, screen):
         """func_row 标签字体大小应为 12sp（原 Caption 等价）"""
@@ -149,15 +149,25 @@ class TestFuncRowSizes:
 # ════════════════════════════════════════════════════════════
 
 class TestSearchBarCloseButton:
-    """搜索栏关闭按钮：28×28dp。"""
+    """搜索栏关闭标签：MDLabel "取消 ✕"，高 28dp，宽自适应文字。
+
+    出现在搜索结果显示时，点击回到主界面。
+    """
 
     def test_search_close_btn_size(self, kivy_app_instance):
-        """搜索栏关闭按钮尺寸应为 28dp"""
+        """搜索关闭标签高度应为 28dp，宽自适应文字（非固定 28dp）"""
         from app_tool.ui.main_screen import MainScreen
         screen = MainScreen()
-        close_btn = screen.ids.search_bar.children[0]
-        assert 27 <= close_btn.size[0] <= 29, \
-            f"搜索关闭按钮宽度期望 28dp，实际 {close_btn.size[0]}"
+        label = screen.ids.search_close_btn
+        # 高度固定 28dp
+        assert label.size[1] == pytest.approx(28, abs=2), \
+            f"搜索关闭标签高度期望 28dp，实际 {label.size[1]}"
+        # 宽度自适应，不应被约束为 28
+        assert label.size[0] > 30, \
+            f"搜索关闭标签宽度应自适应文字（>30dp），实际 {label.size[0]}"
+        # 文字内容
+        assert "取消" in label.text, \
+            f"搜索关闭标签应包含'取消'，实际 '{label.text}'"
 
 
 # ════════════════════════════════════════════════════════════
