@@ -246,23 +246,37 @@ class NoteService:
 
         if pinned_tag_names:
             placeholders = ",".join("?" * len(pinned_tag_names))
+            # 构建标签位置映射：CASE t.name WHEN 'B' THEN 0 WHEN 'A' THEN 1 ... END
+            tag_pos_cases = " ".join(
+                f"WHEN ? THEN {i}" for i in range(len(pinned_tag_names))
+            )
             sql = (
                 "SELECT DISTINCT n.* FROM Note n "
                 "LEFT JOIN NoteTag nt ON n.id = nt.note_id "
                 "LEFT JOIN Tag t ON nt.tag_id = t.id "
                 "WHERE n.is_completed = 0 "
                 "ORDER BY "
-                "  CASE WHEN n.is_pinned = 1 THEN 0 ELSE 1 END, "
-                f"  CASE WHEN t.name IN ({placeholders}) THEN 0 ELSE 1 END, "
+                "  CASE WHEN n.is_pinned = 1 THEN 0"
+                f"       WHEN t.name IN ({placeholders}) THEN 1"
+                "       ELSE 2"
+                "  END, "
+                "  CASE WHEN n.is_pinned = 1 THEN n.pinned_at END DESC, "
+                f"  CASE WHEN n.is_pinned = 0 AND t.name IN ({placeholders}) THEN"
+                f"    CASE t.name {tag_pos_cases} ELSE 999 END"
+                "  END, "
+                f"  CASE WHEN n.is_pinned = 0 AND t.name IN ({placeholders}) THEN n.updated_at END DESC, "
                 f"  {time_col} DESC"
             )
-            rows = self.conn.execute(sql, pinned_tag_names).fetchall()
+            # 参数：3个IN子句 + 1个CASE WHEN标签位置映射
+            params = pinned_tag_names * 4
+            rows = self.conn.execute(sql, params).fetchall()
         else:
             time_col_no_alias = "updated_at" if sort_pref == "updated_at" else "created_at"
             sql = (
                 "SELECT * FROM Note WHERE is_completed = 0 "
                 "ORDER BY "
                 "  CASE WHEN is_pinned = 1 THEN 0 ELSE 1 END, "
+                "  CASE WHEN is_pinned = 1 THEN pinned_at END DESC, "
                 f"  {time_col_no_alias} DESC"
             )
             rows = self.conn.execute(sql).fetchall()

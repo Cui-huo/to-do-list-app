@@ -838,42 +838,58 @@ class MainScreen(ToastMixin, ServiceMixin, MDScreen):
     def refresh_list(self):
         note_svc, tag_svc, search_svc = self._get_services()
 
-        self.ids.incomplete_box.clear_widgets()
-        self.ids.completed_box.clear_widgets()
+        inc_box = self.ids.incomplete_box
+        cmp_box = self.ids.completed_box
 
-        if self._current_search_params:
-            notes = search_svc.search(**self._current_search_params)
-            incomplete_notes = [n for n in notes if not n.is_completed]
-            completed_notes = [n for n in notes if n.is_completed]
-        else:
-            incomplete_notes = note_svc.get_incomplete()
-            completed_notes = note_svc.get_completed()
+        # 冻结自适应高度：避免每次 add_widget 触发 minimum_height 重算
+        inc_box.unbind(minimum_height=inc_box.setter('height'))
+        cmp_box.unbind(minimum_height=cmp_box.setter('height'))
+        inc_h = inc_box.height
+        cmp_h = cmp_box.height
+        inc_box.height = inc_h
+        cmp_box.height = cmp_h
 
-        # 批量获取所有便签的标签（一次 SQL 消除 N+1）
-        all_note_ids = [n.id for n in incomplete_notes] + [n.id for n in completed_notes]
-        all_tags = note_svc.get_tags_batch(all_note_ids) if all_note_ids else {}
+        try:
+            inc_box.clear_widgets()
+            cmp_box.clear_widgets()
 
-        if not incomplete_notes and not completed_notes:
-            empty_label = MDLabel(
-                text="还没有便签，点击右下角 + 创建一个吧",
-                font_style="Body1",
-                halign="center",
-                theme_text_color="Hint",
-                size_hint_y=None,
-                height=dp(200),
-            )
-            self.ids.incomplete_box.add_widget(empty_label)
-            self.ids.completed_label.text = "已完成 (0)"
-            return
+            if self._current_search_params:
+                notes = search_svc.search(**self._current_search_params)
+                incomplete_notes = [n for n in notes if not n.is_completed]
+                completed_notes = [n for n in notes if n.is_completed]
+            else:
+                incomplete_notes = note_svc.get_incomplete()
+                completed_notes = note_svc.get_completed()
 
-        for note in incomplete_notes:
-            card = self._build_note_card(note, all_tags.get(note.id, []))
-            self.ids.incomplete_box.add_widget(card)
+            # 批量获取所有便签的标签（一次 SQL 消除 N+1）
+            all_note_ids = [n.id for n in incomplete_notes] + [n.id for n in completed_notes]
+            all_tags = note_svc.get_tags_batch(all_note_ids) if all_note_ids else {}
 
-        self.ids.completed_label.text = f"已完成 ({len(completed_notes)})"
-        for note in completed_notes:
-            card = self._build_note_card(note, all_tags.get(note.id, []))
-            self.ids.completed_box.add_widget(card)
+            if not incomplete_notes and not completed_notes:
+                empty_label = MDLabel(
+                    text="还没有便签，点击右下角 + 创建一个吧",
+                    font_style="Body1",
+                    halign="center",
+                    theme_text_color="Hint",
+                    size_hint_y=None,
+                    height=dp(200),
+                )
+                inc_box.add_widget(empty_label, index=len(inc_box.children))
+                self.ids.completed_label.text = "已完成 (0)"
+                return
+
+            for note in incomplete_notes:
+                card = self._build_note_card(note, all_tags.get(note.id, []))
+                inc_box.add_widget(card, index=len(inc_box.children))
+
+            self.ids.completed_label.text = f"已完成 ({len(completed_notes)})"
+            for note in completed_notes:
+                card = self._build_note_card(note, all_tags.get(note.id, []))
+                cmp_box.add_widget(card, index=len(cmp_box.children))
+        finally:
+            # 恢复自适应高度：一次性触发最终布局
+            inc_box.bind(minimum_height=inc_box.setter('height'))
+            cmp_box.bind(minimum_height=cmp_box.setter('height'))
 
         self._update_undo_btn_visibility()
         self._update_completed_visibility()
@@ -960,9 +976,35 @@ class MainScreen(ToastMixin, ServiceMixin, MDScreen):
         try:
             if card.is_completed:
                 note_svc.mark_incomplete(card.note_id)
+                # 增量：从已完成区移除，插入到未完成区
+                self.ids.completed_box.remove_widget(card)
+                card.is_completed = False
+                card._apply_visual_state()
+                inc_box = self.ids.incomplete_box
+                # 插入到置顶卡片之后、非置顶卡片之前
+                insert_idx = len(inc_box.children)
+                for i, child in enumerate(inc_box.children):
+                    if not getattr(child, "is_pinned", False):
+                        insert_idx = i
+                        break
+                inc_box.add_widget(card, index=insert_idx)
+                self._update_completed_label()
+                self._update_completed_visibility()
             else:
                 note_svc.mark_complete(card.note_id)
-            self.refresh_list()
+                # 增量：从未完成区移除，加入已完成区
+                self.ids.incomplete_box.remove_widget(card)
+                card.is_completed = True
+                card._apply_visual_state()
+                self.ids.completed_box.add_widget(
+                    card, index=len(self.ids.completed_box.children)
+                )
+                self._update_completed_label()
+                # 自动展开已完成区，让用户看到刚完成的卡片
+                if not self._completed_expanded:
+                    self._completed_expanded = True
+                    self._update_completed_visibility()
+            self._update_undo_btn_visibility()
         except ValueError as e:
             self._toast(str(e))
 
@@ -1014,7 +1056,8 @@ class MainScreen(ToastMixin, ServiceMixin, MDScreen):
         if children and hasattr(children[-1], "text") and "还没有便签" in (children[-1].text or ""):
             box.remove_widget(children[-1])
         # 找到正确插入位置：新便签不置顶，排在所有置顶卡片之后
-        insert_idx = 0
+        # 默认追加到末尾（视觉底部）；若存在非置顶卡片，插到第一个非置顶之前
+        insert_idx = len(children)
         for i, child in enumerate(children):
             if not getattr(child, "is_pinned", False):
                 insert_idx = i
@@ -1028,7 +1071,11 @@ class MainScreen(ToastMixin, ServiceMixin, MDScreen):
         note_svc, _, _ = self._get_services()
 
         def on_confirm():
-            note_svc.delete(card.note_id)
+            try:
+                note_svc.delete(card.note_id)
+            except ValueError as e:
+                self._toast(str(e))
+                return
             self.refresh_list()
             self._toast("应用未关闭的12小时内，可以撤销最近1条删除")
 
@@ -1073,6 +1120,10 @@ class MainScreen(ToastMixin, ServiceMixin, MDScreen):
         new_pref = "created_at" if current == "updated_at" else "updated_at"
         note_svc.set_sort_preference(new_pref)
         self._update_sort_label()
+        if new_pref == "updated_at":
+            self._toast("按更新时间排序")
+        else:
+            self._toast("按创建时间排序")
         if self._current_search_params:
             self.refresh_list()
         else:
@@ -1081,33 +1132,56 @@ class MainScreen(ToastMixin, ServiceMixin, MDScreen):
     def _reorder_cards(self):
         """排序切换时复用现有卡片，只重排不重建。"""
         note_svc, _, _ = self._get_services()
-        # 收集现有卡片
-        existing: dict[int, NoteCard] = {}
-        for box in (self.ids.incomplete_box, self.ids.completed_box):
-            for child in list(box.children):
-                if hasattr(child, "note_id"):
-                    existing[child.note_id] = child
-                    box.remove_widget(child)
 
-        incomplete_notes = note_svc.get_incomplete()
-        completed_notes = note_svc.get_completed()
+        inc_box = self.ids.incomplete_box
+        cmp_box = self.ids.completed_box
 
-        all_note_ids = [n.id for n in incomplete_notes] + [n.id for n in completed_notes]
-        all_tags = note_svc.get_tags_batch(all_note_ids) if all_note_ids else {}
+        # 冻结自适应高度：避免每次 add_widget 触发 minimum_height 重算
+        # 导致 O(N²) 布局开销，使标题栏/功能栏短暂消失
+        inc_box.unbind(minimum_height=inc_box.setter('height'))
+        cmp_box.unbind(minimum_height=cmp_box.setter('height'))
+        inc_h = inc_box.height
+        cmp_h = cmp_box.height
+        inc_box.height = inc_h
+        cmp_box.height = cmp_h
 
-        for note in incomplete_notes:
-            card = existing.get(note.id) or self._build_note_card(note, all_tags.get(note.id, []))
-            self.ids.incomplete_box.add_widget(card)
+        try:
+            # 收集现有卡片
+            existing: dict[int, NoteCard] = {}
+            for box in (inc_box, cmp_box):
+                for child in list(box.children):
+                    if hasattr(child, "note_id"):
+                        existing[child.note_id] = child
+                        box.remove_widget(child)
 
-        self.ids.completed_label.text = f"已完成 ({len(completed_notes)})"
-        for note in completed_notes:
-            card = existing.get(note.id) or self._build_note_card(note, all_tags.get(note.id, []))
-            self.ids.completed_box.add_widget(card)
+            incomplete_notes = note_svc.get_incomplete()
+            completed_notes = note_svc.get_completed()
+
+            all_note_ids = [n.id for n in incomplete_notes] + [n.id for n in completed_notes]
+            all_tags = note_svc.get_tags_batch(all_note_ids) if all_note_ids else {}
+
+            for note in incomplete_notes:
+                card = existing.get(note.id) or self._build_note_card(note, all_tags.get(note.id, []))
+                inc_box.add_widget(card, index=len(inc_box.children))
+
+            for note in completed_notes:
+                card = existing.get(note.id) or self._build_note_card(note, all_tags.get(note.id, []))
+                cmp_box.add_widget(card, index=len(cmp_box.children))
+        finally:
+            # 恢复自适应高度：一次性触发最终布局
+            inc_box.bind(minimum_height=inc_box.setter('height'))
+            cmp_box.bind(minimum_height=cmp_box.setter('height'))
 
         self._update_undo_btn_visibility()
         self._update_completed_visibility()
 
     # ── 已完成区折叠 ──
+
+    def _update_completed_label(self):
+        """更新「已完成 (N)」标签。"""
+        count = sum(1 for c in self.ids.completed_box.children
+                    if hasattr(c, "note_id"))
+        self.ids.completed_label.text = f"已完成 ({count})"
 
     def _update_completed_visibility(self):
         if self._completed_expanded:
@@ -1165,7 +1239,7 @@ class MainScreen(ToastMixin, ServiceMixin, MDScreen):
         self.ids.search_label.text = ""
         self.ids.search_close_btn.opacity = 0
         self.ids.search_close_btn.disabled = True
-        self.refresh_list()
+        self._reorder_cards()
 
     # ── 导航 ──
 
