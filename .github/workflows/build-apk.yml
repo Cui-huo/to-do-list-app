@@ -40,7 +40,6 @@ jobs:
             zlib1g-dev \
             libncurses5-dev \
             libncursesw5-dev \
-            libtinfo5 \
             libsdl2-dev \
             libsdl2-image-dev \
             libsdl2-mixer-dev \
