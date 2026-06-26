@@ -32,3 +32,8 @@ Thumbs.db
 *.apk
 *.aab
 bin/
+# Buildozer
+.buildozer/
+.buildozer_android/
+packages/
+_buildozer_download_cache/

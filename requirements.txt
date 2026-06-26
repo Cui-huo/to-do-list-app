@@ -1,0 +1,9 @@
+# 便签应用 — Python 依赖
+# 桌面开发环境使用。Android APK 构建依赖见 buildozer.spec。
+
+kivy>=2.3.0
+kivymd>=1.2.0
+markdown>=3.5
+plyer>=2.1
+webdavclient3>=3.14
+pytest>=8.0
