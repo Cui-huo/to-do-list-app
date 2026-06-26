@@ -44,14 +44,9 @@ jobs:
             libncursesw5-dev
           pip install buildozer==1.5.0 cython setuptools
 
-      - name: Accept Android SDK licenses
-        run: |
-          mkdir -p /home/runner/.buildozer/android/platform/android-sdk/licenses
-          echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > /home/runner/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
-
       - name: Build APK
         run: |
-          buildozer android debug
+          yes | buildozer android debug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
