@@ -1,8 +1,8 @@
-"""红灯测试 — 三大功能区排序规则（ui_spec.md §八 2026-06-25 更新）。
+"""排序规则验证测试 — 三大功能区排序规则（ui_spec.md §八 2026-06-25 更新）。
 
-预期行为：
-1. 手动置顶区：按 updated_at DESC 排序（非 pinned_at DESC）
-2. 标签置顶区：按 updated_at DESC 排序（非标签选择顺序）
+验证：
+1. 手动置顶区：按 updated_at DESC 排序
+2. 标签置顶区：按 updated_at DESC 排序
 3. pin_note() 同时刷新 updated_at
 4. 两大置顶区免疫排序按钮
 5. 冲突去重：手动置顶优先，标签置顶跳过已在手动置顶区的便签
@@ -31,19 +31,18 @@ def tag_svc(db_conn):
 
 
 # ═══════════════════════════════════════════════════════════
-# 红灯-01：手动置顶区按 updated_at DESC 排序
+# 01：手动置顶区按 updated_at DESC 排序
 # ═══════════════════════════════════════════════════════════
 
 class TestManualPinSortedByUpdatedAt:
     """预期：手动置顶区按 updated_at DESC，非 pinned_at DESC。"""
 
     def test_manual_pin_by_updated_at_not_pinned_at(self, note_svc):
-        """FIXME-RED：手动置顶区应优先按 updated_at 排序，非 pinned_at。
+        """手动置顶区应优先按 updated_at 排序，非 pinned_at。
 
         设计：n1 先创建先置顶（pinned_at 旧），后编辑 → updated_at 最新。
         n2 后创建后置顶（pinned_at 新），不编辑 → updated_at 较旧。
         预期 updated_at DESC：[n1, n2]。
-        当前 bug：pinned_at DESC → [n2, n1]。
         """
         n1 = note_svc.create(title="先来先置顶后编辑", content="内容1")
         note_svc.pin_note(n1.id)
@@ -61,8 +60,7 @@ class TestManualPinSortedByUpdatedAt:
 
         notes = note_svc.get_incomplete()
 
-        # FIXME-RED 预期：updated_at DESC → n1 在前
-        # 当前 bug：pinned_at DESC → n2 在前
+        # 预期：updated_at DESC → n1 在前
         assert notes[0].id == n1.id, (
             f"手动置顶区应按 updated_at DESC：n1(updated_at 最新)应在前，"
             f"但 pinned_at DESC 让 n2(pinned_at 更新) 排到了前面"
@@ -70,13 +68,12 @@ class TestManualPinSortedByUpdatedAt:
         assert notes[1].id == n2.id
 
     def test_manual_pin_updated_at_order_differs_from_pinned_at(self, note_svc):
-        """FIXME-RED：当 updated_at 顺序与 pinned_at 顺序冲突时，
+        """当 updated_at 顺序与 pinned_at 顺序冲突时，
         应以 updated_at 为准。
 
         设计：n1 先创建、先置顶、后编辑 → updated_at 最新，但 pinned_at 旧。
         n2 后创建、后置顶 → updated_at 较旧，但 pinned_at 新。
         预期：n1 在前（updated_at 最新）。
-        当前 bug：pinned_at DESC 会让 n2 排前。
         """
         n1 = note_svc.create(title="先来后更新", content="内容1")
         note_svc.pin_note(n1.id)
@@ -94,8 +91,7 @@ class TestManualPinSortedByUpdatedAt:
 
         notes = note_svc.get_incomplete()
 
-        # FIXME-RED 预期：updated_at DESC → n1 在前
-        # 当前 bug：pinned_at DESC → n2 在前
+        # 预期：updated_at DESC → n1 在前
         assert notes[0].id == n1.id, (
             f"手动置顶区应按 updated_at DESC：n1(updated_at 最新)应在前，"
             f"但 pinned_at DESC 让 n2(pinned_at 更新) 排到了前面"
@@ -104,17 +100,16 @@ class TestManualPinSortedByUpdatedAt:
 
 
 # ═══════════════════════════════════════════════════════════
-# 红灯-02：标签置顶区按 updated_at DESC 排序
+# 02：标签置顶区按 updated_at DESC 排序
 # ═══════════════════════════════════════════════════════════
 
 class TestTagPinSortedByUpdatedAt:
     """预期：标签置顶区按 updated_at DESC，非标签选择顺序。"""
 
     def test_tag_pin_by_updated_at_not_selection_order(self, note_svc, tag_svc):
-        """FIXME-RED：标签置顶区所有便签统一按 updated_at DESC 排序。
+        """标签置顶区所有便签统一按 updated_at DESC 排序。
 
         设计：B→A 顺序置顶标签。nB 含标签B（先创建），nA 含标签A（后创建）。
-        当前 bug：按标签选择顺序排列 → nB 在 nA 前。
         预期：按 updated_at DESC → nA 在 nB 前（后创建→updated_at 更新）。
         """
         tag_svc.create("A")
@@ -131,8 +126,7 @@ class TestTagPinSortedByUpdatedAt:
 
         notes = note_svc.get_incomplete()
 
-        # FIXME-RED 预期：updated_at DESC → nA（更新）在前
-        # 当前 bug：按标签选择顺序 → nB（标签B先选）在前
+        # 预期：updated_at DESC → nA（更新）在前
         assert notes[0].id == nA.id, (
             f"标签置顶区应按 updated_at DESC：后创建的 nA(id={nA.id}) 应在前，"
             f"但标签选择顺序让 nB(id={nB.id}) 排到了前面"
@@ -140,7 +134,7 @@ class TestTagPinSortedByUpdatedAt:
         assert notes[1].id == nB.id
 
     def test_tag_pin_multiple_tags_all_by_updated_at(self, note_svc, tag_svc):
-        """FIXME-RED：多个标签的便签混排，按 updated_at DESC 统一排序。"""
+        """多个标签的便签混排，按 updated_at DESC 统一排序。"""
         tag_svc.create("工作")
         tag_svc.create("生活")
         tag_svc.set_pinned(["工作", "生活"])
@@ -157,8 +151,7 @@ class TestTagPinSortedByUpdatedAt:
 
         notes = note_svc.get_incomplete()
 
-        # FIXME-RED 预期：updated_at DESC → [n3, n2, n1]
-        # 当前 bug：按标签选择顺序分组 → [n1, n3, n2]
+        # 预期：updated_at DESC → [n3, n2, n1]
         assert notes[0].id == n3.id, (
             f"标签置顶区应按 updated_at DESC 统一排序，n3 最后创建应排第一"
         )
@@ -167,16 +160,16 @@ class TestTagPinSortedByUpdatedAt:
 
 
 # ═══════════════════════════════════════════════════════════
-# 红灯-03：pin_note() 刷新 updated_at
+# 03：pin_note() 刷新 updated_at
 # ═══════════════════════════════════════════════════════════
 
 class TestPinNoteUpdatesUpdatedAt:
     """预期：pin_note() 同时设置 updated_at = now。"""
 
     def test_pin_note_refreshes_updated_at(self, note_svc):
-        """FIXME-RED：pin_note() 应将 updated_at 设为当前时间。
+        """pin_note() 应将 updated_at 设为当前时间。
 
-        当前 bug：pin_note 只设置 pinned_at，不碰 updated_at。
+        pin_note() 同时设置 updated_at。
         """
         note = note_svc.create(title="测试置顶", content="内容")
         original_updated_at = note.updated_at
@@ -184,19 +177,19 @@ class TestPinNoteUpdatesUpdatedAt:
 
         pinned = note_svc.pin_note(note.id)
 
-        # FIXME-RED 预期：置顶后 updated_at 应更新
+        # 预期：置顶后 updated_at 应更新
         assert pinned.updated_at != original_updated_at, (
             f"pin_note() 应刷新 updated_at。"
             f"原始={original_updated_at}, 置顶后={pinned.updated_at}"
         )
 
     def test_pin_note_updated_at_is_later_after_sleep(self, note_svc):
-        """FIXME-RED：置顶后 updated_at 应大于置顶前的原始值。"""
+        """置顶后 updated_at 应大于置顶前的原始值。"""
         note = note_svc.create(title="测试", content="内容")
         time.sleep(0.020)
         pinned = note_svc.pin_note(note.id)
 
-        # FIXME-RED 预期：置顶后的 updated_at > 创建时的 updated_at
+        # 预期：置顶后的 updated_at > 创建时的 updated_at
         assert pinned.updated_at > note.updated_at, (
             f"pin_note() 后的 updated_at({pinned.updated_at}) "
             f"应 > 创建时的 updated_at({note.updated_at})"
@@ -204,14 +197,14 @@ class TestPinNoteUpdatesUpdatedAt:
 
 
 # ═══════════════════════════════════════════════════════════
-# 红灯-04：两大置顶区免疫排序按钮
+# 04：两大置顶区免疫排序按钮
 # ═══════════════════════════════════════════════════════════
 
 class TestPinZonesImmuneToSortToggle:
     """预期：手动置顶区和标签置顶区不受排序偏好切换影响。"""
 
     def test_manual_pin_zone_order_unchanged_after_sort_toggle(self, note_svc):
-        """FIXME-RED：切换排序偏好后，手动置顶区顺序不变。
+        """切换排序偏好后，手动置顶区顺序不变。
 
         设计：n1 先创建后置顶再编辑 → updated_at 最新、created_at 旧。
         n2 后创建先置顶不编辑 → updated_at 旧、created_at 新。
@@ -241,7 +234,7 @@ class TestPinZonesImmuneToSortToggle:
         note_svc.set_sort_preference("created_at")
         notes2 = note_svc.get_incomplete()
 
-        # FIXME-RED 预期：手动置顶区免疫排序 → 仍为 [n1, n2]
+        # 预期：手动置顶区免疫排序 → 仍为 [n1, n2]
         assert notes2[0].id == n1.id, (
             f"手动置顶区应免疫排序切换。created_at DESC 下 n1(id={n1.id}) "
             f"仍应在 n2(id={n2.id}) 之前"
@@ -249,11 +242,11 @@ class TestPinZonesImmuneToSortToggle:
         assert notes2[1].id == n2.id
 
     def test_tag_pin_zone_order_unchanged_after_sort_toggle(self, note_svc, tag_svc):
-        """FIXME-RED：切换排序偏好后，标签置顶区顺序不变。此测试为假绿灯守门——
+        """切换排序偏好后，标签置顶区顺序不变。此测试为假绿灯守门——
 
         当前代码在标签置顶组内以 updated_at DESC 为主排序键，
         {time_col} 仅作为第 3 排序键 → 大多数场景不起作用 → 假绿灯。
-        真红灯由下方的 _equal_updated_at 变体暴露。
+        此测试的 _equal_updated_at 变体进一步验证免疫行为。
         """
         tag_svc.create("工作")
         tag_svc.set_pinned(["工作"])
@@ -281,7 +274,7 @@ class TestPinZonesImmuneToSortToggle:
         assert notes2[1].id == n2.id
 
     def test_tag_pin_immunity_equal_updated_at(self, note_svc, tag_svc):
-        """FIXME-RED：updated_at 相同时，created_at 尾排序不应影响标签置顶区。
+        """updated_at 相同时，created_at 尾排序不应影响标签置顶区。
 
         核心设计：通过直接 SQL 强制两便签 updated_at 完全相同，
         使当前代码的 {time_col} DESC 尾排序成为唯一决定因素。
@@ -314,14 +307,13 @@ class TestPinZonesImmuneToSortToggle:
         ]
 
         # 切换到 created_at DESC，time_col = created_at
-        # 当前 bug：{time_col} DESC → n2.created_at > n1.created_at → [n2, n1]
         note_svc.set_sort_preference("created_at")
         notes_after = note_svc.get_incomplete()
         tag_order_after = [
             n.id for n in notes_after if n.id in (n1.id, n2.id)
         ]
 
-        # FIXME-RED 预期：标签置顶区免疫 → 顺序不变
+        # 预期：标签置顶区免疫 → 顺序不变
         assert tag_order_after == tag_order_before, (
             f"标签置顶区应免疫排序切换。updated_at 相同时，"
             f"created_at DESC 不应影响标签置顶区顺序。\n"
@@ -331,7 +323,7 @@ class TestPinZonesImmuneToSortToggle:
 
 
 # ═══════════════════════════════════════════════════════════
-# 红灯-05：冲突去重 — 手动置顶优先 + 标签置顶跳过
+# 05：冲突去重 — 手动置顶优先 + 标签置顶跳过
 # ═══════════════════════════════════════════════════════════
 
 class TestPinConflictDedup:
@@ -389,7 +381,7 @@ class TestPinConflictDedup:
 
 
 # ═══════════════════════════════════════════════════════════
-# 红灯-06：非置顶区正常参与排序
+# 06：非置顶区正常参与排序
 # ═══════════════════════════════════════════════════════════
 
 class TestUnpinnedAreaNormalSort:

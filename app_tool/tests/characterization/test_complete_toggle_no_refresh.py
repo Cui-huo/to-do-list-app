@@ -1,7 +1,7 @@
-"""红灯测试 — 标记完成/取消完成时不应触发全量 rebuild。
+"""标记完成/取消完成增量更新验证测试。
 
-验证：_handle_complete_toggle 应采用增量更新（移动卡片），
-而非 refresh_list()（全量 clear_widgets + 重建）。
+验证：_handle_complete_toggle 采用增量更新（移动卡片），
+不触发全量 clear_widgets + 重建。
 
 对应 spec: ui_spec.md §8.x, FEATURE_TESTS.md
 """
@@ -29,15 +29,10 @@ class TestCompleteToggleNoFullRebuild:
     """标记完成：移动卡片而非全量 rebuild。"""
 
     def test_mark_complete_preserves_other_incomplete_cards(self, kivy_app_instance, svc):
-        """红灯：标记一张卡为完成时，其他未完成卡片保留在原处不被 clear。
+        """标记一张卡为完成时，其他未完成卡片保留在原处不被 clear。
 
-        当前行为（BUG）：_handle_complete_toggle → refresh_list() → clear_widgets()
-        会清除 incomplete_box 中所有卡片并重建，导致：
-        1. 操作卡顿（O(N) 重建）
-        2. 观察视图可能跳动
-
-        预期行为：卡片从 incomplete_box 移除并加入 completed_box，
-        其他卡片的 widget 实例保持不变。
+        当前实现：_handle_complete_toggle 使用增量更新（remove_widget + add_widget），
+        不触发全量 clear_widgets。
         """
         from app_tool.ui.main_screen import MainScreen
 
@@ -103,7 +98,7 @@ class TestCompleteToggleNoFullRebuild:
             "n1 仍在未完成区：未被全量清理"
         )
         assert id(card_n1_after) == card_n1_id_before, (
-            "FIXME-RED：_handle_complete_toggle 调用了 refresh_list() 导致全量重建，"
+            "_handle_complete_toggle 调用了 refresh_list() 导致全量重建，"
             f"n1 的 widget 引用已改变（旧 id={card_n1_id_before}，新 id={id(card_n1_after)}）。"
             "预期行为：其他卡片 widget 实例保持不变，仅被标记的卡片移动。"
         )
@@ -112,15 +107,14 @@ class TestCompleteToggleNoFullRebuild:
         card_n3_after = find_card(cmp_box, n3.id)
         assert card_n3_after is not None, "n3 仍在已完成区"
         assert id(card_n3_after) == card_n3_id_before, (
-            "FIXME-RED：refresh_list() 也重建了已完成区的卡片，"
+            "refresh_list() 也重建了已完成区的卡片，"
             f"n3 的 widget 引用已改变（旧 id={card_n3_id_before}，新 id={id(card_n3_after)}）。"
         )
 
     def test_mark_complete_expands_completed_section(self, kivy_app_instance, svc):
-        """红灯：标记完成时，已完成区域应自动展开以显示新完成的卡片。
+        """标记完成时，已完成区域应自动展开以显示新完成的卡片。
 
-        当前行为（BUG）：_handle_complete_toggle → refresh_list() → _update_completed_visibility()
-        保持折叠状态，用户完成一张卡后看不到它——需要手动展开已完成区。
+        标记完成后自动展开已完成区，让用户看到刚完成的卡片。
         """
         from app_tool.ui.main_screen import MainScreen
 
@@ -156,11 +150,11 @@ class TestCompleteToggleNoFullRebuild:
 
         # ---- 断言：已完成区域应自动展开 ----
         assert screen._completed_expanded is True, (
-            "FIXME-RED：标记完成时应自动展开已完成区，"
+            "标记完成时应自动展开已完成区，"
             "让用户能看到刚完成的卡片。当前行为：已完成区保持折叠。"
         )
         assert screen.ids.completed_box.opacity == 1, (
-            "FIXME-RED：已完成区应变为可见"
+            "已完成区应变为可见"
         )
 
     def test_mark_incomplete_preserves_other_completed_cards(self, kivy_app_instance, svc):
@@ -218,14 +212,14 @@ class TestCompleteToggleNoFullRebuild:
         card_n1_after = find_card(cmp_box, n1.id)
         assert card_n1_after is not None
         assert id(card_n1_after) == card_n1_id_before, (
-            "FIXME-RED：取消完成时 refresh_list() 重建了已完成区卡片"
+            "取消完成时 refresh_list() 重建了已完成区卡片"
         )
 
         # n3 引用未变
         card_n3_after = find_card(inc_box, n3.id)
         assert card_n3_after is not None
         assert id(card_n3_after) == card_n3_id_before, (
-            "FIXME-RED：取消完成时 refresh_list() 重建了未完成区卡片"
+            "取消完成时 refresh_list() 重建了未完成区卡片"
         )
 
     def test_completed_label_updates_after_toggle(self, kivy_app_instance, svc):
@@ -294,10 +288,9 @@ class TestCollapsePreservesScrollPosition:
     def test_collapse_never_changes_completed_box_height(
         self, kivy_app_instance, svc
     ):
-        """红灯：_update_completed_visibility 不应设 height=0。
+        """_update_completed_visibility 不应设 height=0。
 
-        当前行为（BUG）：折叠时 set height=0，展开时 set height=minimum_height，
-        破坏 KV 绑定 height: self.minimum_height。
+        折叠时仅切换 opacity + disabled，内容高度保持不变。
         """
         import inspect
         from app_tool.ui.main_screen import MainScreen
@@ -308,7 +301,7 @@ class TestCollapsePreservesScrollPosition:
             if 'height' in l and 'completed_box' in l
         ]
         assert not lines_with_height, (
-            "FIXME-RED：_update_completed_visibility 不应修改 completed_box.height。"
+            "_update_completed_visibility 不应修改 completed_box.height。"
             "KV 绑定 height: self.minimum_height 已自动处理折叠和展开。"
             f"违规代码行: {lines_with_height}"
         )
@@ -323,7 +316,7 @@ class TestCollapsePreservesScrollPosition:
         source = inspect.getsource(MainScreen._update_completed_visibility)
         assert 'opacity' in source, "'opacity' 是必需的"
         assert 'disabled' in source, (
-            "FIXME-RED：_update_completed_visibility 中无 disabled 切换"
+            "_update_completed_visibility 中无 disabled 切换"
         )
 
     def test_collapse_does_not_contain_height_zero(
@@ -335,7 +328,7 @@ class TestCollapsePreservesScrollPosition:
 
         source = inspect.getsource(MainScreen._update_completed_visibility)
         assert 'height = 0' not in source.replace(' ', ''), (
-            "FIXME-RED：折叠时不应将 completed_box.height 设为 0。"
+            "折叠时不应将 completed_box.height 设为 0。"
             "内容高度应保持不变。"
         )
 

@@ -1,4 +1,4 @@
-"""test_database.py — 数据库建表/FTS5/索引/种子数据/CRUD 测试（红灯）。"""
+"""test_database.py — 数据库建表/FTS5/索引/种子数据/CRUD 测试。"""
 
 import pytest
 import sqlite3

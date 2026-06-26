@@ -1,7 +1,4 @@
-"""红灯测试 — 排序与置顶行为预期（预期行为 vs 现状 gap）。
-
-这些测试验证 ui_spec.md §八 定义的预期行为。
-当前代码不满足预期 → 红灯。修复后 → 绿灯。
+"""排序与置顶行为验证测试（ui_spec.md §八 预期行为）。
 
 对应 spec: ui_spec.md §八, spec.md §5.1, FEATURE_TESTS.md CT-P0-04/07/08/09
 """
@@ -27,14 +24,14 @@ def tag_svc(db_conn):
 
 
 # ═══════════════════════════════════════════════════════════
-# 红灯-01：手动置顶区不受排序按钮影响
+# 01：手动置顶区不受排序按钮影响
 # ═══════════════════════════════════════════════════════════
 
 class TestManualPinAreaImmuneToSort:
-    """预期：手动置顶区始终按 pinned_at DESC，排序偏好只影响非置顶区。"""
+    """预期：手动置顶区免疫排序偏好，排序偏好只影响非置顶区。"""
 
     def test_manual_pin_order_unchanged_after_sort_toggle(self, note_svc):
-        """预期(FIXME-RED)：切换排序偏好后，手动置顶便签保持 pinned_at 顺序不变。
+        """切换排序偏好后，手动置顶便签保持 updated_at 顺序不变。
 
         设计：n1 先创建但后置顶（pinned_at 更新 → 应排在前），
         n2 后创建但先置顶（created_at 更新但 pinned_at 更旧 → 应排在后）。
@@ -69,8 +66,7 @@ class TestManualPinAreaImmuneToSort:
         note_svc.set_sort_preference("created_at")
         notes2 = note_svc.get_incomplete()
 
-        # FIXME-RED 预期：n1 仍在前面（手动置顶区按 pinned_at，不受 created_at 影响）
-        # 当前 bug：created_at DESC 会使 n2（后创建）排到 n1 前面
+        # 预期：n1 仍在前面（手动置顶区免疫排序）
         assert notes2[0].id == n1.id, (
             f"手动置顶区应免疫排序偏好。n1(pinned_at={n1.pinned_at})应在前，"
             f"但 created_at DESC 让 n2(created_at={n2.created_at}) 排到了前面"
@@ -94,11 +90,11 @@ class TestManualPinAreaImmuneToSort:
 
 
 # ═══════════════════════════════════════════════════════════
-# 红灯-02：标签置顶区按标签选择顺序排列
+# 02：标签置顶区按 updated_at DESC 排序
 # ═══════════════════════════════════════════════════════════
 
 class TestTagPinAreaOrderBySelectionOrder:
-    """预期：不同置顶标签的便签按标签选择顺序排列（pinned_tags 数组顺序）。"""
+    """预期：不同置顶标签的便签按 updated_at DESC 排序。"""
 
     def test_tag_pin_order_follows_selection_order(self, note_svc, tag_svc):
         """标签置顶区按 updated_at DESC 排序，不受标签选择顺序影响。
@@ -141,14 +137,14 @@ class TestTagPinAreaOrderBySelectionOrder:
 
 
 # ═══════════════════════════════════════════════════════════
-# 红灯-03：手动置顶 + 标签置顶冲突去重
+# 03：手动置顶 + 标签置顶冲突去重
 # ═══════════════════════════════════════════════════════════
 
 class TestPinConflictDedup:
     """预期：同时手动置顶+含置顶标签的便签仅出现在手动置顶区。"""
 
     def test_manual_pin_overrides_tag_pin_dedup(self, note_svc, tag_svc):
-        """预期(FIXME-RED)：便签同时手动置顶+含置顶标签时，仅出现一次（手动置顶区）。
+        """便签同时手动置顶+含置顶标签时，仅出现一次（手动置顶区）。
 
         现状(gap)：DISTINCT 可去重 row 级别的重复，
         但便签仍在两个 CASE WHEN 中都被匹配。
@@ -164,7 +160,7 @@ class TestPinConflictDedup:
 
         notes = note_svc.get_incomplete()
 
-        # FIXME-RED 预期：便签仅在手动置顶区出现一次
+        # 预期：便签仅在手动置顶区出现一次
         occurrences = [n for n in notes if n.id == n1.id]
         assert len(occurrences) == 1, (
             f"便签 ID={n1.id} 同时手动置顶+含置顶标签，"
@@ -175,14 +171,14 @@ class TestPinConflictDedup:
 
 
 # ═══════════════════════════════════════════════════════════
-# 红灯-04：新便签在非置顶区最上方
+# 04：新便签在非置顶区最上方
 # ═══════════════════════════════════════════════════════════
 
 class TestNewNotePosition:
     """预期：新创建的未置顶便签在非置顶区最上方（置顶便签之下、旧便签之上）。"""
 
     def test_new_note_at_top_of_unpinned_sorted_by_created_at(self, note_svc):
-        """预期(FIXME-RED)：created_at DESC 排序，新便签在非置顶区最前。
+        """created_at DESC 排序，新便签在非置顶区最前。
 
         服务层 get_incomplete() 返回 created_at DESC，新便签应排在首位。
         此测试验证服务层返回顺序正确——UI 层 add_widget 反转是另一个 bug。
@@ -194,13 +190,13 @@ class TestNewNotePosition:
         note_svc.set_sort_preference("created_at")
         notes = note_svc.get_incomplete()
 
-        # FIXME-RED 预期：新便签（后创建）排在前面
+        # 预期：新便签（后创建）排在前面
         assert notes[0].id == new.id, (
             f"created_at DESC 排序，新便签({new.id})应在旧便签({old.id})之前"
         )
 
     def test_new_note_at_top_of_unpinned_sorted_by_updated_at(self, note_svc):
-        """预期(FIXME-RED)：updated_at DESC 排序，新便签在非置顶区最前。"""
+        """updated_at DESC 排序，新便签在非置顶区最前。"""
         old = note_svc.create(title="旧便签", content="旧内容")
         time.sleep(0.010)
         new = note_svc.create(title="新便签", content="新内容")
@@ -208,7 +204,7 @@ class TestNewNotePosition:
         # 默认 updated_at DESC
         notes = note_svc.get_incomplete()
 
-        # FIXME-RED 预期：新便签（最近更新）排在前面
+        # 预期：新便签（最近更新）排在前面
         assert notes[0].id == new.id, (
             f"updated_at DESC 排序，新便签({new.id})应在旧便签({old.id})之前"
         )

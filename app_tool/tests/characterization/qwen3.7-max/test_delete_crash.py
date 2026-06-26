@@ -1,4 +1,4 @@
-"""红灯测试 — 删除便签后应用闪退 (ValueError: 便签 ID=N 不存在)。
+"""删除便签后应用闪退修复验证测试 (ValueError: 便签 ID=N 不存在)。
 
 问题行为：删除便签确认后应用闪退，报错 ValueError: 便签 ID=34 不存在。
 根因：_handle_delete 的 on_confirm 回调没有 try/except，
@@ -19,7 +19,7 @@ class TestDeleteCallbackErrorHandling:
     """_handle_delete 的 on_confirm 回调必须有 try/except 防御。"""
 
     def test_on_confirm_has_try_except(self):
-        """FIXME-RED：on_confirm 回调必须捕获 ValueError。
+        """on_confirm 回调必须捕获 ValueError。
 
         当便签已被其他操作删除（或 note_id 过期），
         note_svc.delete() 抛 ValueError，不捕获则闪退。
@@ -97,7 +97,7 @@ class TestRefreshListLayoutFreeze:
     """refresh_list() 也应有布局冻结，避免全量重建时的 O(N²) 卡顿。"""
 
     def test_refresh_list_freezes_adaptive_height(self):
-        """FIXME-RED：refresh_list() 在 clear+add 循环期间应冻结 minimum_height。
+        """refresh_list() 在 clear+add 循环期间应冻结 minimum_height。
 
         refresh_list() 做 clear_widgets + 逐条 add_widget，
         每次 add_widget 触发 minimum_height 重算 → O(N²) 布局开销。

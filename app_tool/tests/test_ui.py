@@ -1,7 +1,6 @@
-"""UI 组件尺寸与样式测试 —— ui_spec.md 合规性验证（红灯）。
+"""UI 组件尺寸与样式测试 —— ui_spec.md 合规性验证。
 
 本测试文件验证所有 UI 组件符合 ui_spec.md 中定义的尺寸、字体、间距标准。
-当前代码尚未调整到 spec 标准，预期红灯。
 
 所有测试方法接受 kivy_app_instance fixture（来自 conftest.py）
 """

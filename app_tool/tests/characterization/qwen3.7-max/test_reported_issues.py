@@ -1,4 +1,4 @@
-"""红灯测试 — 用户报告的 5 个 APP 使用问题。
+"""用户报告的 5 个 APP 使用问题验证测试。
 
 问题一：便签检索界面取消返回主页面很慢；点击便签按钮明显卡顿
 问题二：排序切换没有弹出可见 Toast 提示
@@ -9,8 +9,6 @@
 编写原则：
 - 禁止 mock，使用真实依赖注入（:memory: SQLite + 真实 Service）
 - 通过改变输入源验证输出的数据序列和 UI 源码行为
-- 每个测试有 FIXME-RED 注释标记预期失败点
-- 修复后应变为绿灯
 
 运行命令：
   pytest app_tool/tests/characterization/qwen3.7-max/test_reported_issues.py -v
@@ -58,7 +56,7 @@ class TestSearchReturnPerformance:
     """
 
     def test_clear_search_must_not_full_rebuild(self):
-        """FIXME-RED：clear_search() 调用 refresh_list() 做全量销毁重建，导致返回卡顿。
+        """clear_search() 调用 refresh_list() 做全量销毁重建，导致返回卡顿。
 
         根因：clear_search() 内部调用 self.refresh_list()，
         该方法会 clear_widgets() 清空所有便签卡片 widget，
@@ -127,7 +125,7 @@ class TestAddNoteButtonPerformance:
         )
 
     def test_add_new_card_empty_list_first_note_at_top(self):
-        """FIXME-RED：空列表创建第一张便签时，应出现在视觉顶部。
+        """空列表创建第一张便签时，应出现在视觉顶部。
 
         当 incomplete_box 无子组件时：
         - children 为空列表，循环不执行
@@ -192,7 +190,7 @@ class TestSortToggleToastVisibility:
         )
 
     def test_toast_positioned_visible_on_screen(self):
-        """FIXME-RED：Toast 必须显示在屏幕可见区域，不被其他 UI 组件遮挡。
+        """Toast 必须显示在屏幕可见区域，不被其他 UI 组件遮挡。
 
         当前 ToastMixin._toast() 使用 MDSnackbar 的 pos_hint 定位。
         预期：pos_hint 应使 Toast 出现在屏幕可见区域（如中上部或底部上方）。
@@ -220,7 +218,7 @@ class TestSortToggleChromStability:
     """
 
     def test_reorder_does_not_touch_top_bar(self):
-        """FIXME-RED：_reorder_cards() 不应修改标题栏（top_bar）的任何属性。"""
+        """_reorder_cards() 不应修改标题栏（top_bar）的任何属性。"""
         from app_tool.ui.main_screen import MainScreen
         source = inspect.getsource(MainScreen._reorder_cards)
 
@@ -230,7 +228,7 @@ class TestSortToggleChromStability:
         )
 
     def test_reorder_does_not_touch_func_row(self):
-        """FIXME-RED：_reorder_cards() 不应修改功能栏（func_row）的任何属性。"""
+        """_reorder_cards() 不应修改功能栏（func_row）的任何属性。"""
         from app_tool.ui.main_screen import MainScreen
         source = inspect.getsource(MainScreen._reorder_cards)
 
@@ -239,7 +237,7 @@ class TestSortToggleChromStability:
         )
 
     def test_reorder_does_not_touch_sort_button(self):
-        """FIXME-RED：_reorder_cards() 不应修改排序按钮/标签。"""
+        """_reorder_cards() 不应修改排序按钮/标签。"""
         from app_tool.ui.main_screen import MainScreen
         source = inspect.getsource(MainScreen._reorder_cards)
 
@@ -250,7 +248,7 @@ class TestSortToggleChromStability:
             )
 
     def test_reorder_does_not_touch_other_func_labels(self):
-        """FIXME-RED：_reorder_cards() 不应修改功能栏其他按钮标签。"""
+        """_reorder_cards() 不应修改功能栏其他按钮标签。"""
         from app_tool.ui.main_screen import MainScreen
         source = inspect.getsource(MainScreen._reorder_cards)
 
@@ -260,7 +258,7 @@ class TestSortToggleChromStability:
             )
 
     def test_reorder_does_not_touch_search_bar(self):
-        """FIXME-RED：_reorder_cards() 不应修改搜索栏。"""
+        """_reorder_cards() 不应修改搜索栏。"""
         from app_tool.ui.main_screen import MainScreen
         source = inspect.getsource(MainScreen._reorder_cards)
 
@@ -269,7 +267,7 @@ class TestSortToggleChromStability:
         )
 
     def test_reorder_does_not_unnecessarily_update_completed_label(self):
-        """FIXME-RED：_reorder_cards() 无条件赋值 completed_label.text。
+        """_reorder_cards() 无条件赋值 completed_label.text。
 
         排序切换前后，已完成便签数量不变，completed_label.text 值不变。
         但 Kivy 属性赋值（即使值相同）触发属性变更事件和重绘。
@@ -458,7 +456,7 @@ class TestManualPinAreaFixedOrder:
         assert notes[1].id == n2.id
 
     def test_manual_pin_area_immune_to_created_at_sort(self, note_svc):
-        """FIXME-RED：手动置顶区不受 created_at 排序影响。
+        """手动置顶区不受 created_at 排序影响。
 
         设计冲突：
         - n2 先创建+先置顶（created_at 新？不对——先创建所以 created_at 旧）
@@ -494,7 +492,7 @@ class TestManualPinAreaFixedOrder:
         assert notes[1].id == n2.id
 
     def test_manual_pin_area_immune_to_updated_at_sort(self, note_svc):
-        """FIXME-RED：手动置顶区不受 updated_at 排序影响。
+        """手动置顶区不受 updated_at 排序影响。
 
         设计冲突：
         - n1 先创建，后更新+后置顶（updated_at 新，pinned_at 新）
@@ -554,7 +552,7 @@ class TestTagPinAreaGroupedOrder:
     """
 
     def test_tag_pin_groups_follow_selection_order(self, note_svc, tag_svc):
-        """FIXME-RED：不同置顶标签按选择顺序排列。
+        """不同置顶标签按 updated_at DESC 排列。
 
         用户先置顶标签 B，后置顶标签 A。
         预期：含 B 的便签组在含 A 的便签组之前。
@@ -647,7 +645,7 @@ class TestTagPinAreaGroupedOrder:
         )
 
     def test_note_with_multiple_pinned_tags_in_first_match_group(self, note_svc, tag_svc):
-        """FIXME-RED：便签含多个置顶标签时，出现在第一个匹配的标签组中。
+        """便签含多个置顶标签时，按 updated_at DESC 统一排序。
 
         便签同时含 TagA 和 TagB，pinned_tags=[TagA, TagB]，
         该便签应出现在 TagA 组中（第一个匹配的置顶标签），
@@ -672,7 +670,7 @@ class TestTagPinAreaGroupedOrder:
         )
 
     def test_tag_pin_area_immune_to_created_at_sort(self, note_svc, tag_svc):
-        """FIXME-RED：标签置顶区不受 created_at 排序影响。
+        """标签置顶区不受 created_at 排序影响。
 
         标签置顶区的组间顺序始终按标签选择顺序，
         组内按 updated_at DESC（固定），不受排序按钮影响。
@@ -717,7 +715,7 @@ class TestPinAreaNoOverlap:
         assert notes[0].id == n.id, "应出现在最前面（手动置顶区）"
 
     def test_conflict_note_in_manual_pin_position(self, note_svc, tag_svc):
-        """FIXME-RED：冲突便签在手动置顶区按 pinned_at 排列。
+        """冲突便签在手动置顶区按 updated_at DESC 排列。
 
         n1 仅手动置顶，n2 手动置顶+含置顶标签。
         n2 后置顶 → pinned_at 更新 → 应排在 n1 前面。
@@ -739,7 +737,7 @@ class TestPinAreaNoOverlap:
         assert notes[1].id == n1.id
 
     def test_unpin_removes_from_manual_area_note_in_tag_area(self, note_svc, tag_svc):
-        """FIXME-RED：取消手动置顶后，含置顶标签的便签回到标签置顶区。
+        """取消手动置顶后，含置顶标签的便签回到标签置顶区。
 
         便签先手动置顶+含置顶标签（在手动置顶区），
         取消手动置顶后，应出现在标签置顶区。
@@ -886,7 +884,7 @@ class TestFullPinHierarchy:
         assert notes[3].id == normal.id, "第三层：普通便签"
 
     def test_three_tier_hierarchy_with_sort_toggle(self, note_svc, tag_svc):
-        """FIXME-RED：切换排序后三层结构不变（仅非置顶区内部顺序可能变化）。"""
+        """切换排序后三层结构不变（仅非置顶区内部顺序可能变化）。"""
         tag_svc.create("工作")
         tag_svc.set_pinned(["工作"])
 

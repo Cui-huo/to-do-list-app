@@ -1,8 +1,6 @@
-"""红灯测试 — 排序切换 Toast 反馈（预期行为 vs 现状 gap）。
+"""排序切换 Toast 反馈验证测试（ui_spec.md §8.3）。
 
-验证 ui_spec.md §8.3：排序切换时弹出可见 Toast。
-当前代码 toggle_sort_preference() 无 Toast → 红灯。
-
+验证 ui_spec.md §8.3：排序切换时弹出可见 Toast，标题栏/功能栏不刷新。
 对应 spec: ui_spec.md §8.3, FEATURE_TESTS.md CT-P0-07
 """
 
@@ -21,24 +19,22 @@ def note_svc(db_conn):
 
 
 # ═══════════════════════════════════════════════════════════
-# 红灯-05：排序切换无 Toast 反馈
+# 05：排序切换 Toast 反馈
 # ═══════════════════════════════════════════════════════════
 
 class TestSortToggleToast:
-    """预期：排序切换时弹出 Toast 提示。现状：无 Toast。"""
+    """预期：排序切换时弹出 Toast 提示。"""
 
     def test_toggle_sort_preference_lacks_toast_call(self):
-        """FIXME-RED：toggle_sort_preference() 源码中无 _toast 调用。
+        """toggle_sort_preference() 源码中应有 _toast 调用。
 
-        当前代码只更新标签文字和图标，用户看不到排序切换的确认反馈。
-        预期修复：方法末尾应调用 self._toast("按更新时间排序") 或
-        self._toast("按创建时间排序")。
+        排序切换时弹出 Toast 确认反馈。
         """
         from app_tool.ui.main_screen import MainScreen
 
         source = inspect.getsource(MainScreen.toggle_sort_preference)
 
-        # FIXME-RED: 源码中应有 _toast 调用
+        # 源码中应有 _toast 调用
         assert '_toast(' in source, (
             f"toggle_sort_preference() 缺少 _toast() 调用。\n"
             f"当前源码:\n{source}"
@@ -77,14 +73,14 @@ class TestSortToggleToast:
 
 
 # ═══════════════════════════════════════════════════════════
-# 红灯-06：排序切换不应刷新标题栏/功能栏
+# 06：排序切换不应刷新标题栏/功能栏
 # ═══════════════════════════════════════════════════════════
 
 class TestSortToggleTitlebarStability:
-    """预期：排序切换不引起标题栏/功能栏刷新。现状：_reorder_cards 更新了 completed_label。"""
+    """预期：排序切换不引起标题栏/功能栏刷新。"""
 
     def test_reorder_cards_updates_completed_label_unnecessarily(self):
-        """FIXME-RED：_reorder_cards() 无条件更新 completed_label.text。
+        """_reorder_cards() 不应无条件更新 completed_label.text。
 
         排序切换不应该引起标题栏区域（completed_label）的任何变化。
         当前 _reorder_cards() 中：
@@ -95,7 +91,7 @@ class TestSortToggleTitlebarStability:
 
         source = inspect.getsource(MainScreen._reorder_cards)
 
-        # FIXME-RED: _reorder_cards 不应设置 completed_label.text
+        # _reorder_cards 不应设置 completed_label.text
         # 该文本在排序前后没有变化，多余赋值触发不必要的 UI 渲染
         assert 'completed_label.text' not in source, (
             f"_reorder_cards() 不应更新 completed_label.text，"
@@ -104,7 +100,7 @@ class TestSortToggleTitlebarStability:
         )
 
     def test_toggle_sort_preference_does_not_call_refresh_list(self):
-        """FIXME-RED：toggle_sort_preference 在无搜索参数时应走 _reorder_cards。
+        """toggle_sort_preference 在无搜索参数时应走 _reorder_cards。
 
         当前有搜索参数时才走 refresh_list()（全量重建，会刷新标题栏），
         但无搜索参数时走 _reorder_cards()——验证这一点。
@@ -117,4 +113,4 @@ class TestSortToggleTitlebarStability:
         assert 'refresh_list()' in source
         # 确认无搜索参数时走 _reorder_cards（当前行为，正确）
         assert '_reorder_cards()' in source
-        # FIXME-RED: 但 _reorder_cards 内部不应刷新标题栏（见上一个测试）
+        # 但 _reorder_cards 内部不应刷新标题栏（见上一个测试）

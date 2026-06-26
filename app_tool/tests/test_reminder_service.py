@@ -1,4 +1,4 @@
-"""test_reminder_service.py — 提醒 CRUD 测试（红灯）。"""
+"""test_reminder_service.py — 提醒 CRUD 测试。"""
 
 import pytest
 from datetime import datetime, timedelta

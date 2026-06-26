@@ -1,4 +1,4 @@
-"""test_tag_service.py — 标签 CRUD + 置顶管理测试（红灯）。"""
+"""test_tag_service.py — 标签 CRUD + 置顶管理测试。"""
 
 import pytest
 import sqlite3

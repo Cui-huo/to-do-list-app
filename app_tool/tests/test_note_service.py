@@ -1,4 +1,4 @@
-"""test_note_service.py — 便签 CRUD + 排序 + 标签关联测试（红灯）。"""
+"""test_note_service.py — 便签 CRUD + 排序 + 标签关联测试。"""
 
 import time
 

@@ -1,4 +1,4 @@
-"""test_search_service.py — 搜索筛选测试（红灯）。"""
+"""test_search_service.py — 搜索筛选测试。"""
 
 import pytest
 from datetime import datetime

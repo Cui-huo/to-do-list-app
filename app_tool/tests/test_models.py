@@ -1,4 +1,4 @@
-"""test_models.py — 数据类字段与行为测试（红灯）。"""
+"""test_models.py — 数据类字段与行为测试。"""
 
 import pytest
 from datetime import datetime
