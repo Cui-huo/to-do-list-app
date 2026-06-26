@@ -18,6 +18,7 @@ android.minapi = 26
 android.ndk = 25b
 android.sdk = 34
 android.api = 34
+android.build_tools = 34.0.0
 
 # 权限
 android.permissions = INTERNET, VIBRATE, RECEIVE_BOOT_COMPLETED, POST_NOTIFICATIONS
