@@ -27,6 +27,9 @@ jobs:
             git \
             python3-dev \
             ffmpeg \
+            libtool \
+            autoconf \
+            automake \
             libsdl2-dev \
             libsdl2-image-dev \
             libsdl2-mixer-dev \
