@@ -32,6 +32,7 @@ jobs:
             build-essential \
             autoconf \
             libtool \
+            libltdl-dev \
             automake \
             pkg-config \
             cmake \
