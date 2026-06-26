@@ -889,3 +889,79 @@ Qwen Code
 
 → `rules/core_rules.md` **R39**：UI 初始化禁止裸数据库访问，必须 `try/except` 防御
 → `rules/core_rules.md` **R39-A**：测试 conftest 的 `kivy_app_instance` fixture 必须在返回前重置 `kivy_app.db_conn = None`
+
+---
+
+## 10. GitHub Actions APK 构建连续 4 轮失败 — 未遵循「先查后做」原则
+
+### 日期
+
+2026-06-26
+
+### 模型名称
+
+Qwen Code
+
+### 问题描述与背景
+
+GitHub Actions 上 Buildozer 构建 Android APK 持续失败，错误从 `distutils` 缺失 → SDK 许可未接受 → SDK tools 未下载，共经历 4 轮试错才接近解决。根因是 Buildozer + GitHub Actions 已是多年成熟方案，项目内已有 `buildozer-github-actions` skill 明确记录了 Python 版本要求，但 AI 没有 invoke 它，凭猜测从零试错。
+
+### 解决过程
+
+```
+   【用户要求】← 构建 APK 失败了，帮我看看问题
+       ↓
+   【尝试1 — pip install setuptools 提供 distutils】
+   - 错误: ModuleNotFoundError: No module named 'distutils'
+   - 分析: Python 3.12 已移除 distutils，以为 setuptools 能提供 shim
+   - 修复: pip install buildozer==1.5.0 cython setuptools
+       ↓
+   【用户反馈】← 失败 — 同样的 distutils 错误
+   - 关键发现: setuptools shim 对 buildozer 的 import 路径无效
+       ↓
+   【尝试2 — 降级 Python 3.12 → 3.11】
+   - 修复: python-version: '3.12' → '3.11'
+       ↓
+   【用户反馈】← distutils 关通过，但出现新错误：
+   "License android-sdk-license: Accept? (y/N):"
+   SDK 许可协议未接受，build-tools 安装被跳过，Aidl 找不到
+       ↓
+   【尝试3 — 预创建 licenses 目录 + 写入 license hash】
+   - 修复: mkdir licenses/ && echo hash > android-sdk-license
+       ↓
+   【用户反馈】← 失败 — "sdkmanager path does not exist, sdkmanager is not installed"
+   - 关键发现: 预创建目录让 buildozer 误判 SDK 已安装，跳过了 SDK tools 下载
+       ↓
+   【最终方案】← yes | buildozer android debug（标准实践）
+   - 用管道自动应答所有交互提示，不预创建任何目录
+   - 同步添加 android.build_tools = 34.0.0 到 buildozer.spec
+```
+
+### 核心教训
+
+**1. 未查阅现有知识是根本原因**
+
+项目内已有 `buildozer-github-actions` skill 明确写了：
+- "必须用 Python 3.11（非 3.12+）"
+- "setuptools shim 不生效"
+
+如果第一轮就 invoke 这个 skill，distutils 问题直接跳过，至少节省 1 轮构建。
+
+**2. 成熟技术方案应优先参考社区实践**
+
+Buildozer + GitHub Actions 的 APK 构建已有大量公开模板，`yes | buildozer android debug` 是标准写法。SDK license 问题的标准解法也是管道，而非手动创建 license 文件。
+
+**3. 未验证假设就动手 = 引入新问题**
+
+预创建 licenses 目录的假设是"buildozer 会先下载 SDK tools、再检查 license"。实际行为是"检测到 SDK 目录已存在 → 跳过下载 → sdkmanager 不存在 → 报错"。动手前没有验证 buildozer 的 SDK 检测逻辑。
+
+### 涉及文件
+
+| 文件 | 修改 |
+|---|---|
+| `.github/workflows/build-apk.yml` | python-version: 3.12→3.11；Build APK 步骤改为 `yes \| buildozer android debug` |
+| `buildozer.spec` | 添加 `android.build_tools = 34.0.0` |
+
+### 沉淀规则
+
+→ `rules/core_rules.md` **R41**：先查后做 — 解决问题前必须查阅现有知识（skill、memory、错题本、公开最佳实践），禁止凭猜测从零试错
