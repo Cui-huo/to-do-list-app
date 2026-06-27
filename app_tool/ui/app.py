@@ -8,6 +8,7 @@ import sqlite3
 from kivy.clock import Clock
 from kivy.core.text import LabelBase
 from kivy.core.window import Window
+from kivy.utils import platform
 from kivymd.app import MDApp
 from kivymd.uix.screenmanager import MDScreenManager
 
@@ -28,7 +29,12 @@ _FONT_CANDIDATES = [
     "C:\\Windows\\Fonts\\msyhbd.ttc",     # 微软雅黑 粗体
     "C:\\Windows\\Fonts\\simsun.ttc",     # 宋体
     "/System/Library/Fonts/PingFang.ttc", # 苹方 (macOS)
-    "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",  # Android/Linux
+    "/system/fonts/NotoSansCJK-Regular.ttc",       # Android (现代设备)
+    "/system/fonts/NotoSansSC-Regular.otf",        # Android (Noto 简体中文)
+    "/system/fonts/NotoSansCJKsc-Regular.otf",     # Android (变体)
+    "/system/fonts/NotoSansHans-Regular.otf",      # Android (Samsung)
+    "/system/fonts/DroidSansFallback.ttf",         # Android (旧版)
+    "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",  # Linux
 ]
 _FONT_PATH = None
 for _fp in _FONT_CANDIDATES:
@@ -58,6 +64,14 @@ for _fn_name, _fn_path in _CUSTOM_FONTS:
         if _FONT_PATH:
             LabelBase.register(name=_fn_name, fn_regular=_FONT_PATH)
 
+# 系统 CJK 字体未找到时，用自定义字体作为 Roboto 回退
+if not _FONT_PATH:
+    for _fn_name, _fn_path in _CUSTOM_FONTS:
+        if os.path.isfile(_fn_path):
+            for _font_name in ("Roboto", "RobotoLight", "RobotoMedium", "RobotoThin", "RobotoBlack"):
+                LabelBase.register(name=_font_name, fn_regular=_fn_path)
+            break
+
 
 class NotesApp(MDApp):
     """便签应用主类。"""
@@ -74,7 +88,8 @@ class NotesApp(MDApp):
 
     def build(self):
         self.theme_cls.primary_palette = "Indigo"
-        Window.size = (420, 740)
+        if platform != "android":
+            Window.size = (420, 740)
 
         # 数据库初始化（需在读取主题偏好之前）
         self.db_path = os.path.join(self.user_data_dir, DB_FILENAME)
