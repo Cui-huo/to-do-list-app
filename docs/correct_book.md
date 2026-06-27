@@ -892,11 +892,11 @@ Qwen Code
 
 ---
 
-## 10. GitHub Actions APK 构建连续 4 轮失败 — 未遵循「先查后做」原则
+## 10. GitHub Actions APK 构建：从反复失败到成功生成 — 8 轮试错全记录
 
 ### 日期
 
-2026-06-26
+2026-06-26 ~ 2026-06-27
 
 ### 模型名称
 
@@ -904,64 +904,144 @@ Qwen Code
 
 ### 问题描述与背景
 
-GitHub Actions 上 Buildozer 构建 Android APK 持续失败，错误从 `distutils` 缺失 → SDK 许可未接受 → SDK tools 未下载，共经历 4 轮试错才接近解决。根因是 Buildozer + GitHub Actions 已是多年成熟方案，项目内已有 `buildozer-github-actions` skill 明确记录了 Python 版本要求，但 AI 没有 invoke 它，凭猜测从零试错。
+通过 GitHub Actions + Buildozer 构建 Android APK，从首次提交到最终成功安装运行，跨越 8 个独立错误。每个错误都是跨层问题（Python 版本 → SDK 许可 → C 编译 → glibc 兼容 → Gradle → Python 版本不匹配），覆盖了 Buildozer 工具链的全部层级。
 
 ### 解决过程
 
 ```
-   【用户要求】← 构建 APK 失败了，帮我看看问题
+   【用户要求】← 构建 APK 失败了，帮我看看
        ↓
-   【尝试1 — pip install setuptools 提供 distutils】
-   - 错误: ModuleNotFoundError: No module named 'distutils'
-   - 分析: Python 3.12 已移除 distutils，以为 setuptools 能提供 shim
-   - 修复: pip install buildozer==1.5.0 cython setuptools
+   ┌─ 第一层：Python 运行时 ─────────────────────────────┐
+   │                                                      │
+   │ 【尝试1】pip install setuptools 提供 distutils        │
+   │   错误: ModuleNotFoundError: No module named          │
+   │         'distutils'                                   │
+   │   修复: pip install ... setuptools                    │
+   │         ↓                                            │
+   │ 【用户反馈】❌ 失败 — setuptools shim 对 buildozer    │
+   │             的 import 路径无效                        │
+   │         ↓                                            │
+   │ 【尝试2】降级 Python 3.12 → 3.11                      │
+   │   修复: python-version: '3.11'                        │
+   │         ↓                                            │
+   │ 【用户反馈】✅ distutils 关通过                       │
+   └──────────────────────────────────────────────────────┘
        ↓
-   【用户反馈】← 失败 — 同样的 distutils 错误
-   - 关键发现: setuptools shim 对 buildozer 的 import 路径无效
+   ┌─ 第二层：SDK 许可 ──────────────────────────────────┐
+   │                                                      │
+   │ 【尝试3】预创建 licenses 目录 + 写入 license hash     │
+   │   错误: "License android-sdk-license: Accept?"        │
+   │   修复: mkdir licenses/ && echo hash > license        │
+   │         ↓                                            │
+   │ 【用户反馈】❌ 失败 — "sdkmanager path does not       │
+   │             exist, sdkmanager is not installed"       │
+   │   根因: 预创建目录让 buildozer 误判 SDK 已安装，      │
+   │         跳过 SDK tools 下载                           │
+   │         ↓                                            │
+   │ 【尝试4】yes | buildozer android debug（标准方案）    │
+   │         ↓                                            │
+   │ 【用户反馈】✅ 管道自动应答许可，SDK 下载成功          │
+   └──────────────────────────────────────────────────────┘
        ↓
-   【尝试2 — 降级 Python 3.12 → 3.11】
-   - 修复: python-version: '3.12' → '3.11'
+   ┌─ 第三层：C 扩展编译 — libffi ───────────────────────┐
+   │                                                      │
+   │ 【尝试5】安装 libtool + autoconf + automake           │
+   │   错误: configure.ac:215: possibly undefined macro:   │
+   │         LT_SYS_SYMBOL_USCORE                          │
+   │   修复: apt install libtool autoconf automake         │
+   │         ↓                                            │
+   │ 【用户反馈】❌ 失败 — 同样的宏缺失错误                 │
+   │   根本原因: LT_SYS_SYMBOL_USCORE 来自 libltdl-dev，   │
+   │            不是 libtool。搜索社区找到精确答案。       │
+   │         ↓                                            │
+   │ 【尝试6】安装 libltdl-dev                             │
+   │   ③ 社区: CSDN 文章 + GitHub libffi issue #210        │
+   │   → "sudo apt-get install libltdl-dev"                │
+   │         ↓                                            │
+   │ 【用户反馈】✅ libffi 编译通过                        │
+   └──────────────────────────────────────────────────────┘
        ↓
-   【用户反馈】← distutils 关通过，但出现新错误：
-   "License android-sdk-license: Accept? (y/N):"
-   SDK 许可协议未接受，build-tools 安装被跳过，Aidl 找不到
+   ┌─ 第四层：glibc/NDK 交叉编译冲突 ────────────────────┐
+   │                                                      │
+   │ 【尝试7】用户质疑"你真的参考行业最佳实践了吗？"       │
+   │   → 搜索社区：多篇独立文章指出 Ubuntu 24.04 与       │
+   │     Buildozer 存在已知兼容性问题                      │
+   │   错误: __GNUC_PREREQ is not defined                  │
+   │         (宿主机 glibc 2.39 cdefs.h 泄露到 NDK Clang)  │
+   │   修复: runs-on: ubuntu-latest → ubuntu-22.04         │
+   │         ↓                                            │
+   │ 【用户反馈】✅ glibc 兼容问题解决                     │
+   └──────────────────────────────────────────────────────┘
        ↓
-   【尝试3 — 预创建 licenses 目录 + 写入 license hash】
-   - 修复: mkdir licenses/ && echo hash > android-sdk-license
+   ┌─ 第五层：Gradle Java 版本 ──────────────────────────┐
+   │                                                      │
+   │ 【尝试8】设置 JAVA_HOME 为 Java 17                    │
+   │   错误: "Android Gradle plugin requires Java 17.      │
+   │          You are currently using Java 11."            │
+   │   修复: export JAVA_HOME=temurin-17-jdk               │
+   │         ↓                                            │
+   │ 【用户反馈】✅ APK 成功生成！                          │
+   └──────────────────────────────────────────────────────┘
        ↓
-   【用户反馈】← 失败 — "sdkmanager path does not exist, sdkmanager is not installed"
-   - 关键发现: 预创建目录让 buildozer 误判 SDK 已安装，跳过了 SDK tools 下载
-       ↓
-   【最终方案】← yes | buildozer android debug（标准实践）
-   - 用管道自动应答所有交互提示，不预创建任何目录
-   - 同步添加 android.build_tools = 34.0.0 到 buildozer.spec
+   ┌─ 第六层：APK 运行时崩溃 ────────────────────────────┐
+   │                                                      │
+   │ 【用户反馈】❌ 安装后点击闪退，电脑上运行正常          │
+   │   根因: requirements = python3 拉取 Python 3.14       │
+   │         → 与 Kivy 2.3.1 / KivyMD 1.2.0 不兼容       │
+   │         → 用户验证："不是可能不兼容，是一定不兼容"    │
+   │   修复: requirements = python3==3.11,...              │
+   │          （与 CI 构建环境 Python 3.11 一致）          │
+   │         ↓                                            │
+   │ 【最终状态】修正后的 APK 待验证                        │
+   └──────────────────────────────────────────────────────┘
 ```
 
 ### 核心教训
 
-**1. 未查阅现有知识是根本原因**
+**1. AI 自有知识与社区共识的差距（→ R42）**
 
-项目内已有 `buildozer-github-actions` skill 明确写了：
-- "必须用 Python 3.11（非 3.12+）"
-- "setuptools shim 不生效"
+AI 最初引用的"最佳实践"实际来自 auto-skill（对话回放），而非真正的行业共识。用户质问后搜索社区发现：
+- Ubuntu 24.04 不兼容 Buildozer（社区早已知晓，AI 不知）
+- `libltdl-dev` 而非 `libtool` 提供 `LT_SYS_SYMBOL_USCORE`
+- 标准 apt 依赖列表（zip/unzip/cmake/pkg-config/libffi-dev 等）AI 初次未列全
 
-如果第一轮就 invoke 这个 skill，distutils 问题直接跳过，至少节省 1 轮构建。
+**教训**：AI 预训练知识 ≠ 实时社区状态，必须 ①②③ 交叉验证。
 
-**2. 成熟技术方案应优先参考社区实践**
+**2. Python 版本在桌面 vs APK 中的不对称性**
 
-Buildozer + GitHub Actions 的 APK 构建已有大量公开模板，`yes | buildozer android debug` 是标准写法。SDK license 问题的标准解法也是管道，而非手动创建 license 文件。
+桌面开发环境用 Python 3.12（本地 .python312），CI 构建用 Python 3.11（运行 buildozer），APK 内置 Python 由 `requirements` 中的 `python3` 决定。`python3` 无版本约束时 p4a master 拉取最新 Python 3.14 → 与 Kivy 生态不兼容。**三处 Python 版本必须显式管理，不能依赖默认值。**
 
-**3. 未验证假设就动手 = 引入新问题**
+**3. 8 个错误覆盖 Buildozer 全栈层级**
 
-预创建 licenses 目录的假设是"buildozer 会先下载 SDK tools、再检查 license"。实际行为是"检测到 SDK 目录已存在 → 跳过下载 → sdkmanager 不存在 → 报错"。动手前没有验证 buildozer 的 SDK 检测逻辑。
+| 层级 | 错误 | 修复 |
+|------|------|------|
+| Python 运行时 | distutils 缺失 | CI Python 3.12→3.11 |
+| SDK 工具 | License 未接受 + SDK 未下载 | `yes \|` 管道 |
+| C 扩展 | libffi autoreconf 失败 | libltdl-dev |
+| 系统库 | glibc/NDK 交叉编译冲突 | ubuntu-24.04→22.04 |
+| Java 工具链 | Gradle 要求 Java 17 | JAVA_HOME 设置 |
+| APK 内置 | Python 3.14 不兼容 | python3→python3==3.11 |
+
+没有一个错误是重复的，每个都在不同层。这种跨层错误链是 Buildozer 首次配置的常见模式。
+
+**4. "先查后做"原则的价值（→ R41）**
+
+如果第一轮就：
+1. Invoke `buildozer-github-actions` skill → 跳过 distutils 试错
+2. 搜索社区标准 apt 列表 → 跳过 libtool vs libltdl-dev 试错
+3. 搜索 Ubuntu 版本兼容性 → 跳过 24.04 试错
+4. 检查 APK 内置 Python 版本 → 跳过 Python 3.14 崩溃
+
+8 轮错误可压缩到 2-3 轮。
 
 ### 涉及文件
 
-| 文件 | 修改 |
-|---|---|
-| `.github/workflows/build-apk.yml` | python-version: 3.12→3.11；Build APK 步骤改为 `yes \| buildozer android debug` |
-| `buildozer.spec` | 添加 `android.build_tools = 34.0.0` |
+| 文件 | 关键修改 |
+|------|---------|
+| `.github/workflows/build-apk.yml` | Python 3.11 + ubuntu-22.04 + libltdl-dev + cmake/pkg-config 等完整 apt 列表 + JAVA_HOME 设置 + `yes \|` 管道 |
+| `buildozer.spec` | `android.build_tools = 34.0.0` + `requirements = python3==3.11,...` |
 
 ### 沉淀规则
 
-→ `rules/core_rules.md` **R41**：先查后做 — 解决问题前必须查阅现有知识（skill、memory、错题本、公开最佳实践），禁止凭猜测从零试错
+→ `rules/core_rules.md` **R41**：先查后做 — 先查知识再定方案最后动手
+→ `rules/core_rules.md` **R42**：知识来源分级 — 按置信度决策，最高置信度 ①②③ 交叉验证
