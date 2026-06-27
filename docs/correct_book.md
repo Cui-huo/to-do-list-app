@@ -676,7 +676,7 @@ DeepSeek V4 Pro
 
 ### 模型名称
 
-Qwen Code
+DeepSeek V4 Pro
 
 ---
 
@@ -753,7 +753,7 @@ Qwen Code
 
 ### 模型名称
 
-Qwen Code
+DeepSeek V4 Pro
 
 ---
 
@@ -849,7 +849,7 @@ Qwen Code
 
 ### 模型名称
 
-Qwen Code
+DeepSeek V4 Pro
 
 ### 问题描述与背景
 
