@@ -44,16 +44,19 @@ else:
     print("[WARN] 未找到中文字体文件，中文可能无法正常显示", file=sys.stderr)
 
 # 注册项目内自定义字体
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))  # app_tool/ui/
 _CUSTOM_FONTS = [
-    ("AlimamaDongFangDaKai", os.path.join(_PROJECT_ROOT, "font", "阿里妈妈东方大楷（建议先保存，再下载）", "AlimamaDongFangDaKai-Regular.ttf")),
-    ("Lemibo", os.path.join(_PROJECT_ROOT, "font", "乐米波波体_100font", "乐米波波体.ttf")),
+    ("AlimamaDongFangDaKai", os.path.join(_CURRENT_DIR, "..", "res", "fonts", "AlimamaDongFangDaKai.ttf")),
+    ("Lemibo", os.path.join(_CURRENT_DIR, "..", "res", "fonts", "Lemibo.ttf")),
 ]
 for _fn_name, _fn_path in _CUSTOM_FONTS:
     if os.path.isfile(_fn_path):
         LabelBase.register(name=_fn_name, fn_regular=_fn_path)
     else:
         print(f"[WARN] 未找到自定义字体文件: {_fn_path}", file=sys.stderr)
+        # 回退到 CJK 字体，避免 OSError: File 'xxx.ttf' not found
+        if _FONT_PATH:
+            LabelBase.register(name=_fn_name, fn_regular=_FONT_PATH)
 
 
 class NotesApp(MDApp):
