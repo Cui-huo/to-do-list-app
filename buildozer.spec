@@ -27,7 +27,7 @@ android.permissions = INTERNET, VIBRATE, RECEIVE_BOOT_COMPLETED, POST_NOTIFICATI
 android.archs = arm64-v8a, armeabi-v7a
 
 # Python 依赖（Android 构建时安装）
-requirements = python3==3.11,kivy==2.3.1,kivymd==1.2.0,markdown,plyer,webdavclient3
+requirements = python3,kivy==2.3.1,kivymd==1.2.0,markdown,plyer,webdavclient3
 
 # 源码排除
 source.exclude_dirs = .git,.github,.pytest_cache,.qwen,.continue,__pycache__,tests,characterization,docs,.python312,.vscode,build,dist
@@ -61,7 +61,7 @@ android.presplash_color = #1A237E
 android.gradle_dependencies = androidx.core:core:1.9.0
 
 # Kivy 启动参数
-p4a.branch = master
+p4a.branch = v2024.01.21
 
 # Buildozer 固定版本
 buildozer.version = 1.5.0
