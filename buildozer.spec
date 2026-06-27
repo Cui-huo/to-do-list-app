@@ -62,6 +62,7 @@ android.gradle_dependencies = androidx.core:core:1.9.0
 
 # Kivy 启动参数
 p4a.branch = master
+p4a.local_recipes = ./app_tool/recipes
 
 # Buildozer 固定版本
 buildozer.version = 1.5.0
