@@ -54,7 +54,7 @@ jobs:
             gstreamer1.0-plugins-base \
             gstreamer1.0-plugins-good \
             ffmpeg
-          pip install buildozer==1.5.0 cython
+          pip install buildozer==1.6.0 cython
 
       - name: Build APK
         run: |
