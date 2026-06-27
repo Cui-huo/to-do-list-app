@@ -1,7 +1,11 @@
 """数据库初始化：建表 / FTS5虚拟表 / 索引 / 种子标签。"""
 
 import sqlite3
+import sys
 from app_tool.config import SEED_TAGS
+
+# FTS5 可用性标记：Android SQLite 可能未编译 FTS5 扩展
+_has_fts5: bool = True
 
 PRAGMA_FK = "PRAGMA foreign_keys = ON;"
 
@@ -59,9 +63,20 @@ CREATE INDEX IF NOT EXISTS idx_reminder_remind_at ON Reminder(remind_at);
 def init_db(conn: sqlite3.Connection) -> None:
     """执行建表 DDL、FTS5、索引，并写入种子标签。
     幂等：多次调用不会重复建表或重复插入种子标签。
+    FTS5 不可用时静默降级，搜索回退到 LIKE。
     """
+    global _has_fts5
     conn.execute(PRAGMA_FK)
-    conn.executescript(SCHEMA)
+    try:
+        conn.executescript(SCHEMA)
+    except sqlite3.OperationalError as e:
+        if "no such module: fts5" in str(e):
+            _has_fts5 = False
+            # 去除 FTS5 建表语句后重新执行
+            schema_no_fts = _strip_fts5_from_schema(SCHEMA)
+            conn.executescript(schema_no_fts)
+        else:
+            raise
     _seed_tags(conn)
     conn.commit()
 
@@ -74,8 +89,32 @@ def _seed_tags(conn: sqlite3.Connection) -> None:
         )
 
 
+def _strip_fts5_from_schema(schema: str) -> str:
+    """移除 FTS5 虚拟表建表语句，用于不支持 FTS5 的环境。"""
+    lines = schema.split("\n")
+    result: list[str] = []
+    skip_until_semicolon = False
+    for line in lines:
+        if "CREATE VIRTUAL TABLE" in line and "fts5" in line:
+            skip_until_semicolon = True
+            continue
+        if skip_until_semicolon:
+            if ";" in line:
+                skip_until_semicolon = False
+            continue
+        result.append(line)
+    return "\n".join(result)
+
+
+def has_fts5() -> bool:
+    """返回当前环境是否支持 FTS5。"""
+    return _has_fts5
+
+
 def fts_insert(conn: sqlite3.Connection, rowid: int, title: str, content: str) -> None:
-    """向 FTS5 索引插入一条记录。"""
+    """向 FTS5 索引插入一条记录（FTS5 不可用时静默跳过）。"""
+    if not _has_fts5:
+        return
     conn.execute(
         "INSERT INTO notes_fts(rowid, title, content) VALUES (?, ?, ?)",
         (rowid, title, content),
@@ -83,7 +122,9 @@ def fts_insert(conn: sqlite3.Connection, rowid: int, title: str, content: str) -
 
 
 def fts_update(conn: sqlite3.Connection, rowid: int, title: str, content: str) -> None:
-    """更新 FTS5 索引中的一条记录（删旧 + 插新）。"""
+    """更新 FTS5 索引中的一条记录（FTS5 不可用时静默跳过）。"""
+    if not _has_fts5:
+        return
     conn.execute("DELETE FROM notes_fts WHERE rowid = ?", (rowid,))
     conn.execute(
         "INSERT INTO notes_fts(rowid, title, content) VALUES (?, ?, ?)",
@@ -92,5 +133,7 @@ def fts_update(conn: sqlite3.Connection, rowid: int, title: str, content: str) -
 
 
 def fts_delete(conn: sqlite3.Connection, rowid: int) -> None:
-    """从 FTS5 索引删除一条记录。"""
+    """从 FTS5 索引删除一条记录（FTS5 不可用时静默跳过）。"""
+    if not _has_fts5:
+        return
     conn.execute("DELETE FROM notes_fts WHERE rowid = ?", (rowid,))

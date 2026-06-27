@@ -3,6 +3,7 @@
 import sqlite3
 from app_tool.model.models import Note
 from app_tool.controller.note_service import NoteService
+from app_tool.model.database import has_fts5
 
 
 def _is_ascii(s: str) -> bool:
@@ -28,7 +29,7 @@ class SearchService:
         # 关键词
         if keyword and keyword.strip():
             kw = keyword.strip()
-            if _is_ascii(kw):
+            if has_fts5() and _is_ascii(kw):
                 conditions.append(
                     "n.id IN (SELECT rowid FROM notes_fts WHERE notes_fts MATCH ?)"
                 )
