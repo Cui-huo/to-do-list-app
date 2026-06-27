@@ -61,7 +61,7 @@ android.presplash_color = #1A237E
 android.gradle_dependencies = androidx.core:core:1.9.0
 
 # Kivy 启动参数
-p4a.branch = v2024.01.21
+p4a.branch = master
 
 # Buildozer 固定版本
 buildozer.version = 1.5.0
