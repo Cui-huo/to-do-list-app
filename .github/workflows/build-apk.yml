@@ -67,3 +67,10 @@ jobs:
           name: notesapp-apk
           path: bin/*.apk
           retention-days: 30
+
+      - name: Create Release and upload APK
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: bin/*.apk
+          generate_release_notes: true
